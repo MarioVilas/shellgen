@@ -35,11 +35,16 @@ __all__ = [
     'ascii_encode',
     'alpha_encode',
     'unicode_encode',
-    'lowercase_encode',
-    'uppercase_encode',
+
 ]
 
 from base import *
+
+# NOTE: all methods here must invoke the compile() method before returning the
+# shellcode object, so if there are any errors they don't show up later.
+
+##############################################################################
+## Actions.
 
 def shell(arch, os, **options):
     """
@@ -224,20 +229,140 @@ def chmod(arch, os, **options):
     """
     raise NotImplementedError()
 
-def xor_encode(arch, os, bad_chars, **options):
+##############################################################################
+## Encoders.
+
+def xor_encode(payload, bad_chars = "\0\r\n\x1a\"'`%,;:."):
+    """
+    Encode the payload and prepend a XOR-based decoder to B{bypass character
+    filters}.
+    
+    @type  payload: L{Shellcode}
+    @param payload: Payload to encode.
+    
+    @type    bad_chars: str
+    @keyword bad_chars:
+        String containing all the characters that must be avoided.
+        Defaults to the following characters:
+        C{00 0A 0D 1A 22 25 27 2C 2E 3A 3B 60}
+    
+    @rtype:  L{Shellcode}
+    @return: Shellcode object with the encoded payload.
+    
+    @raise ArithmeticError: Could not satisfy the character constraints, or
+        the decoder itself couldn't avoid using bad characters.
+    
+    @raise TypeError: A required option is missing, or an option contains the
+        wrong data type.
+    
+    @raise ValueError: An option contains the correct data type but an
+        incorrect value.
+    
+    @raise NotImplementedError: The specified encoder does not support the
+        requested architecture, operating system or specified options.
+    """
     raise NotImplementedError()
 
-def ascii_encode(arch, os, **options):
+def ascii_encode(payload, allow_upper = True,
+                          allow_lower = True):
+    """
+    Encode the payload and prepend a decoder so the payload uses only standard
+    B{ASCII (7-bit)} characters.
+    
+    @type  payload: L{Shellcode}
+    @param payload: Payload to encode.
+    
+    @type  allow_upper: bool
+    @param allow_upper: C{True} if uppercase letters are allowed, C{False}
+        otherwise. Defaults to C{True}.
+    
+    @type  allow_lower: bool
+    @param allow_lower: C{True} if uppercase letters are allowed, C{False}
+        otherwise. Defaults to C{True}.
+    
+    @rtype:  L{Shellcode}
+    @return: Shellcode object with the encoded payload.
+    
+    @raise ArithmeticError: Could not satisfy the character constraints.
+    
+    @raise TypeError: A required option is missing, or an option contains the
+        wrong data type.
+    
+    @raise ValueError: An option contains the correct data type but an
+        incorrect value.
+    
+    @raise NotImplementedError: The specified encoder does not support the
+        requested architecture, operating system or specified options.
+    """
     raise NotImplementedError()
 
-def alpha_encode(arch, os, **options):
+def alpha_encode(payload, allow_upper = True,
+                          allow_lower = True):
+    """
+    Encode the payload and prepend a decoder so the payload uses only
+    B{alphanumeric} characters.
+    
+    @type  payload: L{Shellcode}
+    @param payload: Payload to encode.
+    
+    @type  allow_upper: bool
+    @param allow_upper: C{True} if uppercase letters are allowed, C{False}
+        otherwise. Defaults to C{True}.
+    
+    @type  allow_lower: bool
+    @param allow_lower: C{True} if uppercase letters are allowed, C{False}
+        otherwise. Defaults to C{True}.
+    
+    @rtype:  L{Shellcode}
+    @return: Shellcode object with the encoded payload.
+    
+    @raise ArithmeticError: Could not satisfy the character constraints.
+    
+    @raise TypeError: A required option is missing, or an option contains the
+        wrong data type.
+    
+    @raise ValueError: An option contains the correct data type but an
+        incorrect value.
+    
+    @raise NotImplementedError: The specified encoder does not support the
+        requested architecture, operating system or specified options.
+    """
     raise NotImplementedError()
 
-def unicode_encode(arch, os, **options):
-    raise NotImplementedError()
-
-def lowercase_encode(arch, os, **options):
-    raise NotImplementedError()
-
-def uppercase_encode(arch, os, **options):
+def unicode_encode(payload, allow_upper = True,
+                            allow_lower = True,
+                            allow_null  = False):
+    """
+    Encode the payload and prepend a decoder so the payload can B{survive
+    ANSI to WIDECHAR conversion}.
+    
+    @type  payload: L{Shellcode}
+    @param payload: Payload to encode.
+    
+    @type  allow_upper: bool
+    @param allow_upper: C{True} if uppercase letters are allowed, C{False}
+        otherwise. Defaults to C{True}.
+    
+    @type  allow_lower: bool
+    @param allow_lower: C{True} if uppercase letters are allowed, C{False}
+        otherwise. Defaults to C{True}.
+    
+    @type  allow_null: bool
+    @param allow_null: C{True} if null wchars are allowed, C{False} otherwise.
+        Defaults to C{False}.
+    
+    @rtype:  L{Shellcode}
+    @return: Shellcode object with the encoded payload.
+    
+    @raise ArithmeticError: Could not satisfy the character constraints.
+    
+    @raise TypeError: A required option is missing, or an option contains the
+        wrong data type.
+    
+    @raise ValueError: An option contains the correct data type but an
+        incorrect value.
+    
+    @raise NotImplementedError: The specified encoder does not support the
+        requested architecture, operating system or specified options.
+    """
     raise NotImplementedError()
