@@ -26,6 +26,9 @@ __all__ = [
     # Library version.
     "version",
 
+    # Helper function to resolve shellcode classes dynamically.
+    "get_shellcode_class",
+
     # Warnings issued by this library are always of this type.
     "ShellcodeWarning",
 
@@ -70,6 +73,58 @@ class final(type):
             if isinstance(clazz, final):
                 raise TypeError("Class %s is final!" % clazz.__name__)
 
+# This method is the reason why it's important to maintain consistent
+# names and interfaces across platforms throughout the library.
+def get_shellcode_class(arch, os, module, classname):
+    """
+    Get the requested shellcode class by classname, module, processor
+    architecture and operating system.
+    
+    Tipically exploits would directly import the shellcode classes, but this
+    helper function is useful if for some reason the platform must be set
+    dynamically.
+    
+    @type  arch: str
+    @param arch: Target processor architecture.
+    
+    @type  os: str
+    @param os: Target operating system.
+        Must be C{None} for OS agnostic shellcodes.
+    
+    @type  module: str
+    @param module: Shellcode module name.
+    
+    @type  classname: str
+    @param classname: Shellcode class name.
+    
+    @rtype:  class
+    @return: Shellcode class.
+    
+    @raise ValueError: Invalid arguments.
+    @raise NotImplementedError: The requested shellcode could not be found.
+    """
+    if "." in arch or arch.startswith("_"):
+        raise ValueError("Bad processor architecture: %r" % arch)
+    if os:
+        if "." in os or os.startswith("_"):
+            raise ValueError("Bad operating system: %r" % os)
+        path = "shellgen.%s.%s.%s" % (arch, os, module)
+    else:
+        path = "shellgen.%s.%s" % (arch, module)
+    if "." in module or module.startswith("_"):
+        raise ValueError("Bad shellcode module: %r" % module)
+    if "." in classname or classname.startswith("_"):
+        raise ValueError("Bad shellcode class: %r" % classname)
+    try:
+        clazz = getattr( __import__(path, fromlist = [classname]), classname )
+    except ImportError, e:
+        msg = "Error loading module %s: %s" % (path, str(e))
+        raise NotImplementedError(msg)
+    except AttributeError, e:
+        msg = "Error loading class %s.%s: %s" % (path, classname, str(e))
+        raise NotImplementedError(msg)
+    return clazz
+
 class ShellcodeWarning (Warning):
     pass
 
@@ -77,6 +132,9 @@ class Shellcode (object):
 
     # Should be redefined by subclasses.
     # TO DO: maybe define lists of possible values outside this class?
+    # TO DO: maybe get arch and os automatically from package names?
+    #        it could be done with @property and checking for None
+    # TO DO: helper functions to check dependencies and constraints
     arch      = None
     os        = None
     requires  = ()
