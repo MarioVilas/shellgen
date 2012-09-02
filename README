@@ -1,0 +1,22 @@
+Shellgen
+--------
+
+This is the project webpage for the Shellgen library. Here you will find documentation, links, notes about the project, news, etc...
+
+This library is part of the Inguma project and provides the ability to generate dynamic payloads for exploits, by combining snippets of code with specific functions. Users can also provide their own code snippets and combine them as well. Additionally users can simply select from a list of generic payloads (remote shell, add a new user, etc...).
+
+Current status: *under development*
+
+Helping with the project
+------------------------
+
+We benefit from any help you can put in Inguma: documentation, bug reports, patches, everything.  In order to start, please click in the "Register" link in the upper right corner, and create a Redmine account.  With it you'll be able to create issues, and if you're involved with the project, eventually modify the wiki, issues and have commit access.  See Development just below.
+
+Development
+-----------
+
+In order to get a read-only access to the Mercurial repository, where all the development happens, just type:
+
+	hg clone http://inguma.eu/repos/shellgen
+
+We strongly recommend that prospective developers use this method for writing code against current HEAD/trunk/tip/latest code.
