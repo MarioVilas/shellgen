@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 ###############################################################################
-# Wraps decoder stubs by providing them the address of their payload          #
-# The decoder stub MUST clean up the stack or this won't work!                #
-# Shellcode for ShellGen                                                      #
+## Wraps decoder stubs by providing them the address of their payload        ##
+## The decoder stub MUST clean up the stack or this won't work!              ##
+## Shellcode for ShellGen                                                    ##
 ###############################################################################
 
 # Copyright (c) 2012 Mario Vilas

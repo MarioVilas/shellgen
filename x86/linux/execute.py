@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 ###############################################################################
-# Execute any command in Linux/x86                                            #
-# Shellcode for ShellGen                                                      #
-# Based on original code by Sergio 'shadown' Alvarez (shadown@gmail.com)      #
+## Execute any command in Linux/x86                                          ##
+## Shellcode for ShellGen                                                    ##
+## Based on original code by Sergio 'shadown' Alvarez (shadown@gmail.com)    ##
 ###############################################################################
 
 # Copyright (c) 2012 Mario Vilas, Sergio Alvarez

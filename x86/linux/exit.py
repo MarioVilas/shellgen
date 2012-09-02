@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 ###############################################################################
-# Kill the current process on Linux/x86                                       #
-# Shellcode for ShellGen                                                      #
+## Kill the current process on Linux/x86                                     ##
+## Shellcode for ShellGen                                                    ##
 ###############################################################################
 
 # Copyright (c) 2012 Mario Vilas

@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 ###############################################################################
-# Recover root privileges by calling setreuid(0, 0) on Linux/x86              #
-# Shellcode for ShellGen                                                      #
+## Recover root privileges by calling setreuid(0, 0) on Linux/x86            ##
+## Shellcode for ShellGen                                                    ##
 ###############################################################################
 
 # Copyright (c) 2012 Mario Vilas

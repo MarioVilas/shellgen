@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
 ###############################################################################
-# Execute any command on Linux/MIPS                                           #
-# Shellcode for ShellGen                                                      #
-# Based on anonymous code found on the Internet                               #
-# http://www.shell-storm.org/shellcode/files/shellcode-141.php                #
+## Execute any command on Linux/MIPS                                         ##
+## Shellcode for ShellGen                                                    ##
+## Based on anonymous code found on the Internet                             ##
+## http://www.shell-storm.org/shellcode/files/shellcode-141.php              ##
 ###############################################################################
 
 # Copyright (c) 2012 Mario Vilas

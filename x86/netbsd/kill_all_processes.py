@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 ###############################################################################
-# NetBSD/x86 - kills all processes in the system                              #
-# Shellcode for ShellGen                                                      #
+## NetBSD/x86 - kills all processes in the system                            ## 
+## Shellcode for ShellGen                                                    ##
 ###############################################################################
 
 # Copyright (c) 2012 Mario Vilas

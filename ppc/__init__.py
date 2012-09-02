@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 ###############################################################################
-# PowerPC shellcodes for ShellGen                                             #
+## PowerPC shellcodes for ShellGen                                           ##
 ###############################################################################
 
 # Copyright (c) 2012 Mario Vilas

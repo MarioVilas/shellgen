@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 ###############################################################################
-# GetPC x86 shellcode for ShellGen                                            #
-# Based on idea by Skylined                                                   #
-# http://skypher.com/wiki/index.php/Hacking/Shellcode/GetPC                   #
+## GetPC x86 shellcode for ShellGen                                          ##
+## Based on idea by Skylined                                                 ##
+## http://skypher.com/wiki/index.php/Hacking/Shellcode/GetPC                 ##
 ###############################################################################
 
 # Copyright (c) 2012 Mario Vilas

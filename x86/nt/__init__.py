@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 ###############################################################################
-# Windows NT native x86 shellcodes for ShellGen                               #
+## Windows NT native x86 shellcodes for ShellGen                             ##
 ###############################################################################
 
 # Copyright (c) 2012 Mario Vilas

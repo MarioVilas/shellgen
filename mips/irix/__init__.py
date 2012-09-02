@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 ###############################################################################
-# IRIX/MIPS shellcodes for ShellGen                                           #
+## IRIX/MIPS shellcodes for ShellGen                                         ##
 ###############################################################################
 
 # Copyright (c) 2012 Mario Vilas

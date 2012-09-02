@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
 ###############################################################################
-# Fork and drop a suid shell in /tmp for Linux/x86                            #
-# Shellcode for ShellGen                                                      #
-# Based on original code by anonymous author                                  #
-# http://www.shell-storm.org/shellcode/files/shellcode-540.php                #
+## Fork and drop a suid shell in /tmp for Linux/x86                          ##
+## Shellcode for ShellGen                                                    ##
+## Based on original code by anonymous author                                ##
+## http://www.shell-storm.org/shellcode/files/shellcode-540.php              ##
 ###############################################################################
 
 # Copyright (c) 2012 Mario Vilas

@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
 ###############################################################################
-# Execute any command in Solaris/x86                                          #
-# Shellcode for ShellGen                                                      #
-# Based on anonymous code found on the Internet                               #
-# http://www.exploit-db.com/exploits/13502/                                   #
+## Execute any command in Solaris/x86                                        ##
+## Shellcode for ShellGen                                                    ##
+## Based on anonymous code found on the Internet                             ##
+## http://www.exploit-db.com/exploits/13502/                                 ##
 ###############################################################################
 
 # Copyright (c) 2012 Mario Vilas

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 ###############################################################################
-# Windows/x86-64 shellcodes for ShellGen                                      #
+## Windows/x86-64 shellcodes for ShellGen                                    ##
 ###############################################################################
 
 # Copyright (c) 2012 Mario Vilas

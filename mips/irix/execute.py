@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
 ###############################################################################
-# Execute any command in IRIX/MIPS                                            #
-# Shellcode for ShellGen                                                      #
-# Based on anonymous code found on the Internet                               #
-# http://www.shell-storm.org/shellcode/files/shellcode-139.php                #
+## Execute any command in IRIX/MIPS                                          ##
+## Shellcode for ShellGen                                                    ##
+## Based on anonymous code found on the Internet                             ##
+## http://www.shell-storm.org/shellcode/files/shellcode-139.php              ##
 ###############################################################################
 
 # Copyright (c) 2012 Mario Vilas

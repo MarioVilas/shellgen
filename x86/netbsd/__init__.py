@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 ###############################################################################
-# NetBSD/x86 shellcodes for ShellGen                                          #
+## NetBSD/x86 shellcodes for ShellGen                                        ##
 ###############################################################################
 
 # Copyright (c) 2012 Mario Vilas

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 ###############################################################################
-# Linux/x86 shellcodes for ShellGen                                           #
+## Linux/x86 shellcodes for ShellGen                                         ##
 ###############################################################################
 
 # Copyright (c) 2012 Mario Vilas
