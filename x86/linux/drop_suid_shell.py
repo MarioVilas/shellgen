@@ -31,9 +31,9 @@ from shellgen import Static
 class DropSuidShell (Static):
     arch      = "x86"
     os        = "linux"
-    requires  = ()
-    provides  = ("payload", "root")
-    qualities = ("termnull")
+    requires  = []
+    provides  = ["payload", "root"]
+    qualities = ["termnull"]
 
     bytes = (
 

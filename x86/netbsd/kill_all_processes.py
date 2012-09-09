@@ -31,7 +31,7 @@ class KillAllProcesses (Static):
     os        = "netbsd"
     requires  = ()
     provides  = ()
-    qualities = ("nullfree")
+    qualities = ["nullfree"]
 
     bytes = (
 

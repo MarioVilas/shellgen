@@ -30,9 +30,9 @@ from shellgen import Dynamic
 class Execute (Dynamic):
     arch      = "x86"
     os        = "linux"
-    requires  = ()
-    provides  = ("payload")
-    qualities = ("termnull")
+    requires  = []
+    provides  = ["payload"]
+    qualities = ["termnull"]
 
     def __init__(self, command):
         self.command = command

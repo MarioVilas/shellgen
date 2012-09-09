@@ -29,9 +29,9 @@ from shellgen import Static
 class Exit (Static):
     arch      = "x86"
     os        = "linux"
-    requires  = ()
-    provides  = ("payload")     # not really, but execution stops after this
-    qualities = ("nullfree")
+    requires  = []
+    provides  = ["payload"]     # not really, but execution stops after this
+    qualities = ["nullfree"]
 
     def __init__(self, exitcode = None):
 

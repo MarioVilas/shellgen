@@ -137,9 +137,9 @@ class Shellcode (object):
     # TO DO: helper functions to check dependencies and constraints
     arch      = None
     os        = None
-    requires  = ()
-    provides  = ()
-    qualities = ()
+    requires  = []
+    provides  = []
+    qualities = []
 
     # Updated externally on object instances only by Containers.
     _parent = None
@@ -389,6 +389,30 @@ class Concatenator (Container):
     @property
     def children(self):
         return self._children
+
+    # returns the union of all requirements
+    @property
+    def requires(self):
+        requires = []
+        for child in self.children:
+            requires.extend(child.requires)
+        return requires
+
+    # returns the union of all provisions
+    @property
+    def provides(self):
+        provides = []
+        for child in self.children:
+            provides.extend(child.provides)
+        return provides
+
+    # returns the intersection of all qualities
+    @property
+    def qualities(self):
+        qualities = set()
+        for child in self.children:
+            qualities.intersection_update(child.qualities)
+        return list(qualities)
 
     # Concatenate all bytes and gather all stages.
     def compile(self):
