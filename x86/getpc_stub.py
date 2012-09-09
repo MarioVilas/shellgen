@@ -23,6 +23,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA 02110-1301, USA.
 
+__all__ = ["GetPC_Stub"]
+
 from shellgen import Decorator
 
 from struct import pack

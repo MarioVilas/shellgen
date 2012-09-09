@@ -24,6 +24,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA 02110-1301, USA.
 
+__all__ = ["Execute"]
+
 from shellgen import Dynamic
 
 # For example this command sets up a trivial remote backdoor:
