@@ -27,11 +27,8 @@ __all__ = ["Elevate"]
 from shellgen import Static
 
 class Elevate (Static):
-    arch      = "x86"
-    os        = "linux"
-    requires  = []
     provides  = ["root"]
-    qualities = ["nullfree"]
+    encoding  = ["nullfree"]
 
     bytes = (
         "\x6A\x46"      # push 0x46

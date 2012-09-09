@@ -46,14 +46,10 @@ Disassembly of section .text:
 """
 
 class SubSP (Dynamic):
-    arch      = "x86"
-    os        = None
-    requires  = []
-    provides  = []
-    qualities = []  # "nullfree" may be added on runtime
 
     def __init__(self, offset):
         self.offset = offset
+        self.qualities = []  # "nullfree" may be added on runtime
 
     def compile(self):
         offset = self.offset
@@ -67,9 +63,9 @@ class SubSP (Dynamic):
                 bytes = "\x83\xC4" + pack("=b", -offset)
             else:
                 bytes = "\x81\xC4" + pack("<l", -offset)
-            if "\x00" in bytes:
-                if "nullfree" in self.qualities:
-                    self.qualities.remove("nullfree")
-            elif "nullfree" not in self.qualities:
-                self.qualities.append("nullfree")
         self._bytes = bytes
+        if "\x00" in bytes:
+            if "nullfree" in self.qualities:
+                self.qualities.remove("nullfree")
+        elif "nullfree" not in self.qualities:
+            self.qualities.append("nullfree")

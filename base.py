@@ -65,13 +65,28 @@ version = "0.1"
 import weakref
 import warnings
 
-# Metaclass to make sure a given class cannot be subclassed.
-class final(type):
+# Autodetects the platform from the package name if it's ours.
+# User-defined shellcodes should set "arch" and "os" instead.
+try:
+    base_package, base_file = __name__.split(".")[-2:]
+except Exception:
+    raise ImportError("Trying to load %s outside of its package" % __file__)
+class meta_shellcode(type):
     def __init__(cls, name, bases, namespace):
-        super(final, cls).__init__(name, bases, namespace)
+        super(meta_shellcode, cls).__init__(name, bases, namespace)
+        tokens = cls.__module__.split(".")
+        if tokens[0] == base_package and tokens[1] != base_file:
+            tokens.insert(-1, "any")
+            print tokens
+            cls.arch, cls.os = tokens[1:3]
+
+# Metaclass to make sure a final shellcode cannot be subclassed.
+class meta_shellcode_final(meta_shellcode):
+    def __init__(cls, name, bases, namespace):
         for clazz in bases:
-            if isinstance(clazz, final):
+            if isinstance(clazz, meta_shellcode_final):
                 raise TypeError("Class %s is final!" % clazz.__name__)
+        super(meta_shellcode_final, cls).__init__(name, bases, namespace)
 
 # This method is the reason why it's important to maintain consistent
 # names and interfaces across platforms throughout the library.
@@ -125,22 +140,48 @@ def get_shellcode_class(arch, os, module, classname):
         raise NotImplementedError(msg)
     return clazz
 
-class ShellcodeWarning (Warning):
+# Warnings issued by this library are of this type.
+class ShellcodeWarning (RuntimeWarning):
     pass
 
+# Base shellcode class.
 class Shellcode (object):
 
-    # Should be redefined by subclasses.
-    # TO DO: maybe define lists of possible values outside this class?
-    # TO DO: maybe get arch and os automatically from package names?
-    #        it could be done with @property and checking for None
-    # TO DO: helper functions to check dependencies and constraints
-    arch      = None
-    os        = None
+    # Autoloads the platform for our shellcodes.
+    # Does nothing for user-defined shellcodes.
+    __metaclass__ = meta_shellcode
+
+    # Shellcode metadata.
+    #
+    # Supported values for "arch":
+    #   any, mips, ppc, x86, x86_64
+    #
+    # Supported values for "os":
+    #   aix, freebsd, hpux, irix, linux, netbsd,
+    #   nt, openbsd, osx, solaris win32, win64
+    #
+    # Supported values for "requires" and "provides":
+    #   pc, syscall, root
+    #
+    # Supported values for "qualities":
+    #   payload, term_null, balance_stack, preserve_regs,
+    #   stack_exec, no_stack, uses_heap, uses_seh, kernel
+    #
+    # Supported values for "encoding":
+    #   nullfree, ascii, alpha, lower, upper, unicode
+    #
+    # Users may define their own values as well.
+    #
+    arch      = "any"
+    os        = "any"
     requires  = []
     provides  = []
     qualities = []
+    encoding  = []
 
+    # TO DO: helper functions to check dependencies and constraints
+
+    # Weak reference to the parent node.
     # Updated externally on object instances only by Containers.
     _parent = None
 
@@ -174,20 +215,27 @@ class Shellcode (object):
     def clean(self):
         pass
 
+    def _check_platform(self, other):
+        arch = self.arch.lower()
+        os   = self.os.lower()
+        if not arch: arch = "any"
+        if not os:     os = "any"
+        if "any" not in (self.arch, other.arch) and self.arch != other.arch:
+            msg = "Processor architectures don't match: %s and %s"
+            msg = msg % (self.arch, other.arch)
+            warnings.warn(msg, ShellcodeWarning)
+        if "any" not in (self.os, other.os) and self.os != other.os:
+            msg = "Operating systems don't match: %s and %s"
+            msg = msg % (self.os, other.os)
+            warnings.warn(msg, ShellcodeWarning)
+
     def __add__(self, other):
         if isinstance(other, str):    # bytes
             other = Raw(other, self.arch, self.os)
         elif not isinstance(other, Shellcode):
             return NotImplemented
         else:
-            if self.arch and other.arch and self.arch != other.arch:
-                msg = "Processor architectures don't match: %s and %s"
-                msg = msg % (self.arch, other.arch)
-                warnings.warn(msg, ShellcodeWarning)
-            if self.os and other.os and self.os != other.os:
-                msg = "Operating systems don't match: %s and %s"
-                msg = msg % (self.os, other.os)
-                warnings.warn(msg, ShellcodeWarning)
+            self._check_platform(other)
         return Concatenator(self, other)
 
     def __radd__(self, other):
@@ -196,16 +244,10 @@ class Shellcode (object):
         elif not isinstance(other, Shellcode):
             return NotImplemented
         else:
-            if self.arch and other.arch and self.arch != other.arch:
-                msg = "Processor architectures don't match: %s and %s"
-                msg = msg % (self.arch, other.arch)
-                warnings.warn(msg, ShellcodeWarning)
-            if self.os and other.os and self.os != other.os:
-                msg = "Operating systems don't match: %s and %s"
-                msg = msg % (self.os, other.os)
-                warnings.warn(msg, ShellcodeWarning)
+            self._check_platform(other)
         return Concatenator(other, self)
 
+# Static shellcodes are defined when instanced and don't ever change.
 class Static (Shellcode):
 
     # Subclasses MUST define "bytes".
@@ -218,10 +260,13 @@ class Static (Shellcode):
     def compile(self):
         pass
 
+# Raw shellcode class.
+# An easy way to build custom shellcodes without having to think. :)
+# Used automatically when concatenating Python strings to shellcodes.
 class Raw (Static):
 
     # Don't subclass this class.
-    __metaclass__= final
+    __metaclass__= meta_shellcode_final
 
     def __init__(self, bytes, arch, os,
                  requires = None, provides = None, qualities = None):
@@ -344,19 +389,29 @@ class Container (Dynamic):
 class Concatenator (Container):
 
     # Don't subclass this class.
-    __metaclass__= final
+    __metaclass__= meta_shellcode_final
 
     def __init__(self, *children):
         super(Container, self).__init__()
+        
+         # Calculate metadata on runtime.
+         # XXX still not sure about this feature...
+#        self.requires  = property(self._collect_requires)
+#        self.provides  = property(self._collect_provides)
+#        self.qualities = property(self._collect_qualities)
+#        self.encoding  = property(self._collect_encoding)
+        
+        # Build the list of children.
+        parent = weakref.ref(self)
         self._children = list(children)
         for child in self._children:
             if not isinstance(child, Shellcode):
                 raise TypeError(
                     "Expected Shellcode, got %s instead" % type(child))
-            if child.parent:
-                raise ValueError("Already had a parent: %r" % child.parent)
-        parent = weakref.ref(self)
         for child in self._children:
+            if child.parent:
+                msg = "Already had a parent: %r" % child.parent
+                warnings.warn(msg, ShellcodeWarning)
             child._parent = parent
 
     def __iadd__(self, other):
@@ -365,14 +420,7 @@ class Concatenator (Container):
         elif not isinstance(other, Shellcode):
             return NotImplemented
         else:
-            if self.arch and other.arch and self.arch != other.arch:
-                msg = "Processor architectures don't match: %s and %s"
-                msg = msg % (self.arch, other.arch)
-                warnings.warn(msg, ShellcodeWarning)
-            if self.os and other.os and self.os != other.os:
-                msg = "Operating systems don't match: %s and %s"
-                msg = msg % (self.os, other.os)
-                warnings.warn(msg, ShellcodeWarning)
+            self._check_platform(other)
             if isinstance(other, Concatenator):
                 self._children.extend(other.children)
                 parent = weakref.ref(self)
@@ -391,28 +439,34 @@ class Concatenator (Container):
         return self._children
 
     # returns the union of all requirements
-    @property
-    def requires(self):
+    # TODO: revise this concept!
+    def _collect_requires(self):
         requires = []
         for child in self.children:
             requires.extend(child.requires)
         return requires
 
     # returns the union of all provisions
-    @property
-    def provides(self):
+    # TODO: revise this concept!
+    def _collect_provides(self):
         provides = []
         for child in self.children:
             provides.extend(child.provides)
         return provides
 
-    # returns the intersection of all qualities
-    @property
-    def qualities(self):
-        qualities = set()
+    # returns the union of all qualities
+    def _collect_qualities(self):
+        qualities = []
         for child in self.children:
-            qualities.intersection_update(child.qualities)
-        return list(qualities)
+            qualities.extend(child.qualities)
+        return qualities
+
+    # returns the intersection of all encodings
+    def _collect_encodings(self):
+        encodings = set()
+        for child in self.encodings:
+            encodings.intersection_update(child.encodings)
+        return list(encodings)
 
     # Concatenate all bytes and gather all stages.
     def compile(self):

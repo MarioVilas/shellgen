@@ -28,11 +28,7 @@ __all__ = ["Execute"]
 from shellgen import Dynamic
 
 class Execute (Dynamic):
-    arch      = "x86"
-    os        = "linux"
-    requires  = []
-    provides  = ["payload"]
-    qualities = ["termnull"]
+    qualities = ["payload", "term_null"]
 
     def __init__(self, command):
         self.command = command
