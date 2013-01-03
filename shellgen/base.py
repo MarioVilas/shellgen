@@ -26,10 +26,15 @@ ShellGen - Shellcode generator library
 
 @type version: float
 @var  version: Library version.
+
+@type default_bad_chars: str
+@var  default_bad_chars: Default list of bad characters for encoders.
 """
 
 __all__ = [
-    "version", "get_shellcode_class", "get_available_platforms",
+    "version",
+    "get_shellcode_class", "get_available_platforms",
+    "find_bad_chars", "default_bad_chars", "good_chars", "random_chars",
     "ShellcodeWarning",
     "Shellcode", "Dynamic", "Static", "Raw",
     "Container", "Concatenator", "Decorator", "Encoder", "Stager",
@@ -38,6 +43,7 @@ __all__ = [
 
 version = "0.1"
 
+import random
 import weakref
 import warnings
 
@@ -259,6 +265,70 @@ def autodetect_encoding(bytes):
             all( ( bytes[i] == "\x00" for i in xrange(0, len(bytes), 2) ) ):
         encoding.append("unicode")
     return tuple(encoding)
+
+def find_bad_chars(bytes, bad_chars = None):
+    """
+    Test the given bytecode against a list of bad characters.
+
+    @type  bytes: str
+    @param bytes: Compiled bytecode to test for bad characters.
+
+    @type  bad_chars: str
+    @param bad_chars: Bad characters to test.
+        Defaults to L{default_bad_chars}.
+
+    @rtype:  str
+    @return: Bad characters present in the bytecode.
+    """
+    if bad_chars is None:
+        bad_chars = default_bad_chars
+    return "".join( (c for c in bad_chars if c in bytes) )
+
+default_bad_chars = '\x00\t\n\r\x1a !"#$%&\'()+,./:;=[\\]`{|}'
+
+def good_chars(bad_chars = None):
+    """
+    Take a bad chars list and generate the opposite good chars list.
+
+    This can be useful for testing how the vulnerable program filters the
+    characters we feed it.
+
+    @type  bad_chars: str
+    @param bad_chars: Bad characters to test.
+        Defaults to L{default_bad_chars}.
+
+    @rtype:  str
+    @return: Good characters.
+    """
+    if bad_chars is None:
+        bad_chars = default_bad_chars
+    bad_list = set( map(ord, bad_chars) )
+    return "".join( (chr(c) for c in xrange(256) if c not in bad_list) )
+
+def random_chars(length, bad_chars = None):
+    """
+    Generate a string of random characters, avoiding bad characters.
+
+    This can be useful to randomize the payload of our exploits.
+
+    @type  length: int
+    @param length: How many characters to generate.
+
+    @type  bad_chars: str
+    @param bad_chars: Bad characters to test.
+        Defaults to L{default_bad_chars}.
+
+    @rtype:  str
+    @return: String of random characters.
+    """
+    if bad_chars is None:
+        bad_chars = default_bad_chars
+    c = good_chars(bad_chars)
+    if not c:
+        raise ValueError("All characters are bad!")
+    m = len(c) - 1
+    randint = random.randint
+    return "".join( ( c[randint(0, m)] for i in xrange(length) ) )
 
 #-----------------------------------------------------------------------------#
 
