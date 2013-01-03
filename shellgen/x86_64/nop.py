@@ -23,15 +23,7 @@
 
 __all__ = ["Nop"]
 
-from shellgen import Dynamic
+from shellgen.x86.nop import Nop_x86
 
-class Nop (Dynamic):
-    encoding = "nullfree"
-
-    def __init__(self, size = 1):
-        self.size = size
-
-    def compile(self, variables = None):
-        self._bytes = "\x90" * self.size
-
-# TODO: randomized NOP sleds, encoding
+class Nop (Nop_x86):
+    pass

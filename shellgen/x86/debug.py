@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 ###############################################################################
-## Breakpoint x86-64 shellcode for ShellGen                                  ##
+## Various debug x86 shellcodes for ShellGen                                 ##
 ###############################################################################
 
 # Copyright (c) 2012-2013 Mario Vilas
@@ -21,9 +21,9 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA 02110-1301, USA.
 
-__all__ = ["Breakpoint"]
+__all__ = ["Breakpoint", "While1"]
 
-from shellgen import Dynamic
+from shellgen import Dynamic, Static
 
 class Breakpoint (Dynamic):
     encoding = "nullfree"
@@ -33,3 +33,7 @@ class Breakpoint (Dynamic):
 
     def compile(self, variables = None):
         self._bytes = "\xCC" * self.size
+
+class While1 (Static):
+    encoding = "nullfree"
+    bytes = "\xeb\xfe"  # jmp short $-2
