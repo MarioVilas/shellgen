@@ -44,7 +44,7 @@ class Execute (Dynamic):
         if "\x00" in command:
             raise ValueError("Cannot have null chars in command: %r" % command)
 
-    def compile(self):
+    def compile(self, variables = None):
         command = self.command
         if "\x00" in command:
             raise ValueError("Cannot have null chars in command: %r" % command)

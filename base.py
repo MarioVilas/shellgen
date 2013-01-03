@@ -536,7 +536,7 @@ class Static (Shellcode):
     def stages(self):
         return []
 
-    def compile(self):
+    def compile(self, variables = None):
         pass
 
 #-----------------------------------------------------------------------------#

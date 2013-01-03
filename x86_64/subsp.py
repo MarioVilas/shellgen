@@ -57,7 +57,7 @@ class SubSP (Dynamic):
     def __init__(self, offset):
         self.offset = offset
 
-    def compile(self):
+    def compile(self, variables = None):
         offset = self.offset
         pack = struct.pack
         if -128 <= offset <= 127:

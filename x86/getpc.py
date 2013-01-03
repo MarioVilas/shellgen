@@ -35,8 +35,7 @@ class GetPC (Dynamic):
     def __init__(self, pcreg = "ecx"):
         self.pcreg = pcreg
 
-    def compile(self):
-        pcreg = self.pcreg
+    def compile(self, variables = None):
 
         # Jump forward to the call instruction.
         jmp_f = "\xEB\x02"
@@ -72,12 +71,16 @@ class GetPC (Dynamic):
         call_b = "\xE8\xF8\xFF\xFF\xFF"
 
         # Check the register name is valid.
-        pcreg = pcreg.strip().lower()
+        pcreg = self.pcreg.strip().lower()
         if pcreg not in pop:
             raise ValueError("Invalid target register: %s" % pcreg)
 
         # Build the shellcode.
         self._bytes = jmp_f + pop[pcreg] + push[pcreg] + ret + call_b[pcreg]
+
+        # Update the compilation variables.
+        if variables is not None:
+            variables['pcreg'] = pcreg
 
 ##############################################################################
 
@@ -93,8 +96,7 @@ class GetPC_Alt (Dynamic):
     def __init__(self, pcreg = "ecx"):
         self.pcreg = pcreg
 
-    def compile(self):
-        pcreg = self.pcreg
+    def compile(self, variables = None):
 
         # This "call -1" instruction jumps on the last byte of itself, so the
         # next instruction uses an alternate encoding of the "dec" instruction
@@ -138,12 +140,16 @@ class GetPC_Alt (Dynamic):
         }
 
         # Check the register name is valid.
-        pcreg = pcreg.strip().lower()
+        pcreg = self.pcreg.strip().lower()
         if pcreg not in pop:
             raise ValueError("Invalid target register: %s" % pcreg)
 
         # Build the shellcode.
         self._bytes = call_m1 + dec_alt[pcreg] + pop[pcreg] + add_5[pcreg]
+
+        # Update the compilation variables.
+        if variables is not None:
+            variables['pcreg'] = pcreg
 
 ##############################################################################
 
@@ -169,8 +175,7 @@ class GetPC_FPU (Dynamic):
     def __init__(self, pcreg = "ecx"):
         self.pcreg = pcreg
 
-    def compile(self):
-        pcreg = self.pcreg
+    def compile(self, variables = None):
 
         pop = {
             "eax" : "\x58",
@@ -196,11 +201,15 @@ class GetPC_FPU (Dynamic):
         }
 
         # Check the register name is valid.
-        pcreg = pcreg.strip().lower()
+        pcreg = self.pcreg.strip().lower()
         if pcreg not in pop:
             raise ValueError("Invalid target register: %s" % pcreg)
 
         self._bytes = "\xD9\xEE\xD9\x74\xE4\xF4" + pop[pcreg] + add_10[pcreg]
+
+        # Update the compilation variables.
+        if variables is not None:
+            variables['pcreg'] = pcreg
 
 ##############################################################################
 
@@ -217,15 +226,52 @@ class GetPC_Stub (Decorator):
         super(GetPC_Stub, self).__init__(stub)
         self.pcreg = pcreg
 
-    def compile(self):
+    def compile(self, variables = None):
 
         # If there is no child, do nothing.
         if not self.child:
             self._bytes = self._stages = ""
             return
 
+        # Pop register instructions.
+        pop = {
+            "eax" : "\x58",
+            "ecx" : "\x59",
+            "edx" : "\x5A",
+            "ebx" : "\x5B",
+            "esp" : "\x5C",
+            "ebp" : "\x5D",
+            "esi" : "\x5E",
+            "edi" : "\x5F",
+        }
+
+        # Push register instructions.
+        push = {
+            "eax" : "\x50",
+            "ecx" : "\x51",
+            "edx" : "\x52",
+            "ebx" : "\x53",
+            "esp" : "\x54",
+            "ebp" : "\x55",
+            "esi" : "\x56",
+            "edi" : "\x57",
+        }
+
+        # Check the register name is valid.
+        pcreg = self.pcreg.strip().lower()
+        if pcreg not in pop:
+            raise ValueError("Invalid target register: %s" % pcreg)
+
+        # Update the compilation variables.
+        if variables is None:
+            variables = {}
+        variables["pcreg"] = pcreg
+
         # Get the child bytecode and the inherited stages.
-        bytes, stages = self.compile_children()
+        bytes, stages = self.compile_children(variables)
+
+        # Update the compilation variables.
+        del variables["pcreg"]
 
         # Check the decoder stub doesn't exceed the maximum size.
         if len(bytes) > 128:
@@ -239,28 +285,10 @@ class GetPC_Stub (Decorator):
         jmp_f = "\xEB" + pack("b", len(bytes) + 2)
 
         # Pop the return address from the stack.
-        pop = {
-            "eax" : "\x58",
-            "ecx" : "\x59",
-            "edx" : "\x5A",
-            "ebx" : "\x5B",
-            "esp" : "\x5C",
-            "ebp" : "\x5D",
-            "esi" : "\x5E",
-            "edi" : "\x5F",
-        }
+        pop_pc = pop[pcreg]
 
         # Push it back again.
-        push = {
-            "eax" : "\x50",
-            "ecx" : "\x51",
-            "edx" : "\x52",
-            "ebx" : "\x53",
-            "esp" : "\x54",
-            "ebp" : "\x55",
-            "esi" : "\x56",
-            "edi" : "\x57",
-        }
+        push_pc = push[pcreg]
 
         # Return to the payload.
         ret = "\xC3"
@@ -268,13 +296,8 @@ class GetPC_Stub (Decorator):
         # Call to the pop instruction.
         call_b = "\xE8" + pack("<l", -8 - len(bytes))
 
-        # Check the register name is valid.
-        pcreg = self.pcreg.strip().lower()
-        if pcreg not in pop:
-            raise ValueError("Invalid target register: %s" % pcreg)
-
         # Build the shellcode.
-        bytes = jmp_f + pop[pcreg] + push[pcreg] + bytes + ret + call_b
+        bytes = jmp_f + pop_pc + push_pc + bytes + ret + call_b
 
         # Save the shellcode and the inherited stages.
         self._bytes, self._stages = bytes, stages
