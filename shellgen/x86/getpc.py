@@ -80,7 +80,7 @@ class GetPC (Dynamic):
 
         # Update the compilation variables.
         if variables is not None:
-            variables['pcreg'] = pcreg
+            variables['pc'] = pcreg
 
 ##############################################################################
 
@@ -149,7 +149,7 @@ class GetPC_Alt (Dynamic):
 
         # Update the compilation variables.
         if variables is not None:
-            variables['pcreg'] = pcreg
+            variables['pc'] = pcreg
 
 ##############################################################################
 
@@ -209,7 +209,7 @@ class GetPC_FPU (Dynamic):
 
         # Update the compilation variables.
         if variables is not None:
-            variables['pcreg'] = pcreg
+            variables['pc'] = pcreg
 
 ##############################################################################
 
@@ -265,13 +265,13 @@ class GetPC_Stub (Decorator):
         # Update the compilation variables.
         if variables is None:
             variables = {}
-        variables["pcreg"] = pcreg
+        variables["pc"] = pcreg
 
         # Get the child bytecode and the inherited stages.
         bytes, stages = self.compile_children(variables)
 
         # Update the compilation variables.
-        del variables["pcreg"]
+        del variables["pc"]
 
         # Check the decoder stub doesn't exceed the maximum size.
         if len(bytes) > 128:
