@@ -28,12 +28,18 @@ __all__ = ["Execute"]
 from shellgen import Dynamic
 
 class Execute (Dynamic):
-    qualities = ["payload", "term_null"]
+    qualities = "payload"
+    encoding  = "term_null"
 
     def __init__(self, command):
         self.command = command
+        if "\x00" in command:
+            raise ValueError("Cannot have null chars in command: %r" % command)
 
     def compile(self):
+        command = self.command
+        if "\x00" in command:
+            raise ValueError("Cannot have null chars in command: %r" % command)
         self._bytes = (
             "\xEB\x25"              # 00000000: jmp short 0x27
             "\x5A"                  # 00000002: pop edx

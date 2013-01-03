@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 ###############################################################################
-## ShellGen - Shellcode generator library for Python                         ##
+## ShellGen - Shellcode generator library                                    ##
 ###############################################################################
 
 # Copyright (c) 2012 Mario Vilas

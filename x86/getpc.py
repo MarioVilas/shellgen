@@ -29,8 +29,8 @@ from struct import pack
 
 # Classic GetPC implementation using a jump and a call.
 class GetPC (Dynamic):
-    provides  = ["pc"]
-    encoding  = ["nullfree"]
+    provides  = "pc"
+    encoding  = "nullfree"
 
     def __init__(self, pcreg = "ecx"):
         self.pcreg = pcreg
@@ -73,7 +73,7 @@ class GetPC (Dynamic):
 
         # Check the register name is valid.
         pcreg = pcreg.strip().lower()
-        if not pop.has_key(pcreg):
+        if pcreg not in pop:
             raise ValueError("Invalid target register: %s" % pcreg)
 
         # Build the shellcode.
@@ -87,11 +87,8 @@ class GetPC (Dynamic):
 # This optimized version is based on the one published by Skylined:
 #     http://skypher.com/wiki/index.php/Hacking/Shellcode/GetPC
 class GetPC_Alt (Dynamic):
-    arch      = "x86"
-    os        = None
-    requires  = []
-    provides  = ["pc"]
-    qualities = ["nullfree"]
+    provides  = "pc"
+    encoding  = "nullfree"
 
     def __init__(self, pcreg = "ecx"):
         self.pcreg = pcreg
@@ -142,7 +139,7 @@ class GetPC_Alt (Dynamic):
 
         # Check the register name is valid.
         pcreg = pcreg.strip().lower()
-        if not pop.has_key(pcreg):
+        if pcreg not in pop:
             raise ValueError("Invalid target register: %s" % pcreg)
 
         # Build the shellcode.
@@ -166,11 +163,8 @@ class GetPC_Alt (Dynamic):
 # $+10 ...
 #
 class GetPC_FPU (Dynamic):
-    arch      = "x86"
-    os        = None
-    requires  = []
-    provides  = ["pc"]
-    qualities = ["nullfree"]
+    provides  = "pc"
+    encoding  = "nullfree"
 
     def __init__(self, pcreg = "ecx"):
         self.pcreg = pcreg
@@ -202,7 +196,8 @@ class GetPC_FPU (Dynamic):
         }
 
         # Check the register name is valid.
-        if not pop.has_key(pcreg):
+        pcreg = pcreg.strip().lower()
+        if pcreg not in pop:
             raise ValueError("Invalid target register: %s" % pcreg)
 
         self._bytes = "\xD9\xEE\xD9\x74\xE4\xF4" + pop[pcreg] + add_10[pcreg]
@@ -215,23 +210,30 @@ class GetPC_FPU (Dynamic):
 #
 # Note: the decoder stub MUST clean up the stack or this won't work!
 class GetPC_Stub (Decorator):
-    arch      = "x86"
-    os        = None
-    requires  = []
-    provides  = ["pc"]
-    qualities = ["nullfree"]
+    provides  = "pc"
+    encoding  = "nullfree"
 
     def __init__(self, stub, pcreg = "ecx"):
         super(GetPC_Stub, self).__init__(stub)
         self.pcreg = pcreg
 
     def compile(self):
-        pcreg = self.pcreg
+
+        # If there is no child, do nothing.
+        if not self.child:
+            self._bytes = self._stages = ""
+            return
+
+        # Get the child bytecode and the inherited stages.
         bytes, stages = self.compile_children()
 
         # Check the decoder stub doesn't exceed the maximum size.
         if len(bytes) > 128:
             raise ValueError("Decoder stub is larger than 128 bytes")
+
+        # Check the child is stack balanced.
+        if "stack_balanced" not in self.child.qualities:
+            raise ValueError("Decoder stub must be stack balanced")
 
         # Jump to the call instruction.
         jmp_f = "\xEB" + pack("b", len(bytes) + 2)
@@ -267,8 +269,8 @@ class GetPC_Stub (Decorator):
         call_b = "\xE8" + pack("<l", -8 - len(bytes))
 
         # Check the register name is valid.
-        pcreg = pcreg.strip().lower()
-        if not pop.has_key(pcreg):
+        pcreg = self.pcreg.strip().lower()
+        if pcreg not in pop:
             raise ValueError("Invalid target register: %s" % pcreg)
 
         # Build the shellcode.

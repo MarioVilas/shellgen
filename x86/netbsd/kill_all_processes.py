@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 ###############################################################################
-## NetBSD/x86 - kills all processes in the system                            ## 
+## NetBSD/x86 - kills all processes in the system                            ##
 ## Shellcode for ShellGen                                                    ##
 ###############################################################################
 
@@ -27,7 +27,7 @@ __all__ = ["KillAllProcesses"]
 from shellgen import Static
 
 class KillAllProcesses (Static):
-    encoding = ["nullfree"]
+    encoding = "nullfree"
 
     bytes = (
 

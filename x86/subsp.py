@@ -46,10 +46,10 @@ Disassembly of section .text:
 """
 
 class SubSP (Dynamic):
+    encoding = "nullfree"
 
     def __init__(self, offset):
         self.offset = offset
-        self.qualities = []  # "nullfree" may be added on runtime
 
     def compile(self):
         offset = self.offset
@@ -65,7 +65,6 @@ class SubSP (Dynamic):
                 bytes = "\x81\xC4" + pack("<l", -offset)
         self._bytes = bytes
         if "\x00" in bytes:
-            if "nullfree" in self.qualities:
-                self.qualities.remove("nullfree")
-        elif "nullfree" not in self.qualities:
-            self.qualities.append("nullfree")
+            self.remove_encoding("nullfree")
+        else:
+            self.add_encoding("nullfree")

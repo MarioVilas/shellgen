@@ -46,16 +46,16 @@ Disassembly of section .text:
   42:	48 81 c4 88 a9 cb ed 	add    rsp,0xffffffffedcba988
   49:	90                   	nop
   4a:	48 b8 21 43 65 87 78 	movabs rax,0x1234567887654321
-  51:	56 34 12 
+  51:	56 34 12
   54:	48 29 c4             	sub    rsp,rax
   57:	48 01 c4             	add    rsp,rax
 """
 
 class SubSP (Dynamic):
+    encoding = "nullfree"
 
     def __init__(self, offset):
         self.offset = offset
-        self.qualities = []  # "nullfree" may be added on runtime
 
     def compile(self):
         offset = self.offset
@@ -75,7 +75,6 @@ class SubSP (Dynamic):
                 bytes = "\x48\xb8" + pack("<q", offset) + "\x48\x01\xC4"
         self._bytes = bytes
         if "\x00" in bytes:
-            if "nullfree" in self.qualities:
-                self.qualities.remove("nullfree")
-        elif "nullfree" not in self.qualities:
-            self.qualities.append("nullfree")
+            self.remove_encoding("nullfree")
+        else:
+            self.add_encoding("nullfree")

@@ -27,8 +27,8 @@ __all__ = ["Exit"]
 from shellgen import Static
 
 class Exit (Static):
-    qualities = ["payload"]
-    encoding  = ["nullfree"]
+    qualities = ("payload", "stack_balanced")
+    encoding  = "nullfree"
 
     def __init__(self, exitcode = None):
 

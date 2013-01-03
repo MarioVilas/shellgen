@@ -29,8 +29,9 @@ from shellgen import Static
 # Based on original code by anonymous author
 # http://www.shell-storm.org/shellcode/files/shellcode-540.php
 class DropSuidShell (Static):
-    provides  = ["root"]
-    qualities = ["payload", "term_null"]
+    provides  = "root"
+    qualities = ("payload", "stack_balanced")
+    encoding  = "term_null"
 
     bytes = (
 

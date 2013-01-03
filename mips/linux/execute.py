@@ -29,7 +29,8 @@ from shellgen import Dynamic
 # Based on anonymous code found on the Internet
 # http://www.shell-storm.org/shellcode/files/shellcode-141.php
 class Execute (Dynamic):
-    qualities = ["payload", "term_null"]
+    qualities = ("payload", "no_stack")
+    encoding  = "term_null"
 
     def __init__(self, command):
         self.command = command
