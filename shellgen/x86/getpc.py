@@ -35,7 +35,7 @@ class GetPC (Dynamic):
     def __init__(self, pcreg = "ecx"):
         self.pcreg = pcreg
 
-    def compile(self, variables = None):
+    def compile(self, state):
 
         # Jump forward to the call instruction.
         jmp_f = "\xEB\x02"
@@ -76,11 +76,13 @@ class GetPC (Dynamic):
             raise ValueError("Invalid target register: %s" % pcreg)
 
         # Build the shellcode.
-        self._bytes = jmp_f + pop[pcreg] + push[pcreg] + ret + call_b[pcreg]
+        bytes = jmp_f + pop[pcreg] + push[pcreg] + ret + call_b[pcreg]
 
-        # Update the compilation variables.
-        if variables is not None:
-            variables['pc'] = pcreg
+        # Update the compilation state.
+        state.current["pc"] = pcreg
+
+        # Return the bytecode.
+        return bytes
 
 ##############################################################################
 
@@ -96,7 +98,7 @@ class GetPC_Alt (Dynamic):
     def __init__(self, pcreg = "ecx"):
         self.pcreg = pcreg
 
-    def compile(self, variables = None):
+    def compile(self, state):
 
         # This "call -1" instruction jumps on the last byte of itself, so the
         # next instruction uses an alternate encoding of the "dec" instruction
@@ -145,11 +147,13 @@ class GetPC_Alt (Dynamic):
             raise ValueError("Invalid target register: %s" % pcreg)
 
         # Build the shellcode.
-        self._bytes = call_m1 + dec_alt[pcreg] + pop[pcreg] + add_5[pcreg]
+        bytes = call_m1 + dec_alt[pcreg] + pop[pcreg] + add_5[pcreg]
 
-        # Update the compilation variables.
-        if variables is not None:
-            variables['pc'] = pcreg
+        # Update the compilation state.
+        state.current["pc"] = pcreg
+
+        # Return the bytecode.
+        return bytes
 
 ##############################################################################
 
@@ -175,7 +179,7 @@ class GetPC_FPU (Dynamic):
     def __init__(self, pcreg = "ecx"):
         self.pcreg = pcreg
 
-    def compile(self, variables = None):
+    def compile(self, state):
 
         pop = {
             "eax" : "\x58",
@@ -205,11 +209,13 @@ class GetPC_FPU (Dynamic):
         if pcreg not in pop:
             raise ValueError("Invalid target register: %s" % pcreg)
 
-        self._bytes = "\xD9\xEE\xD9\x74\xE4\xF4" + pop[pcreg] + add_10[pcreg]
+        bytes = "\xD9\xEE\xD9\x74\xE4\xF4" + pop[pcreg] + add_10[pcreg]
 
-        # Update the compilation variables.
-        if variables is not None:
-            variables['pc'] = pcreg
+        # Update the compilation state.
+        state.current["pc"] = pcreg
+
+        # Return the bytecode.
+        return bytes
 
 ##############################################################################
 
@@ -226,12 +232,11 @@ class GetPC_Stub (Decorator):
         super(GetPC_Stub, self).__init__(stub)
         self.pcreg = pcreg
 
-    def compile(self, variables = None):
+    def compile(self, state):
 
         # If there is no child, do nothing.
         if not self.child:
-            self._bytes = self._stages = ""
-            return
+            return ""
 
         # Pop register instructions.
         pop = {
@@ -262,16 +267,9 @@ class GetPC_Stub (Decorator):
         if pcreg not in pop:
             raise ValueError("Invalid target register: %s" % pcreg)
 
-        # Update the compilation variables.
-        if variables is None:
-            variables = {}
-        variables["pc"] = pcreg
-
-        # Get the child bytecode and the inherited stages.
-        bytes, stages = self.compile_children(variables)
-
-        # Update the compilation variables.
-        del variables["pc"]
+        # Get the child bytecode.
+        state.current["pc"] = pcreg
+        bytes = self.compile_children(state)
 
         # Check the decoder stub doesn't exceed the maximum size.
         if len(bytes) > 128:
@@ -281,23 +279,23 @@ class GetPC_Stub (Decorator):
         if "stack_balanced" not in self.child.qualities:
             raise ValueError("Decoder stub must be stack balanced")
 
-        # Jump to the call instruction.
+        # ASM: Jump to the call instruction.
         jmp_f = "\xEB" + pack("b", len(bytes) + 2)
 
-        # Pop the return address from the stack.
+        # ASM: Pop the return address from the stack.
         pop_pc = pop[pcreg]
 
-        # Push it back again.
+        # ASM: Push it back again.
         push_pc = push[pcreg]
 
-        # Return to the payload.
+        # ASM: Return to the payload.
         ret = "\xC3"
 
-        # Call to the pop instruction.
+        # ASM: Call to the pop instruction.
         call_b = "\xE8" + pack("<l", -8 - len(bytes))
 
         # Build the shellcode.
         bytes = jmp_f + pop_pc + push_pc + bytes + ret + call_b
 
-        # Save the shellcode and the inherited stages.
-        self._bytes, self._stages = bytes, stages
+        # Return the bytecode.
+        return bytes

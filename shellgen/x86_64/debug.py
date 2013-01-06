@@ -21,12 +21,12 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA 02110-1301, USA.
 
-__all__ = ["Breakpoint", "While1"]
+# No unit test here.
+if __name__ == '__main__':
+    import sys
+    sys.exit(0)
 
 from shellgen.x86.debug import *
-
-class Breakpoint (Breakpoint):
-    pass
-
-class While1 (While1):
-    pass
+from shellgen.x86.debug import __all__
+from shellgen.base import copy_classes
+copy_classes(__all__, __name__, vars())

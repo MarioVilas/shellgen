@@ -23,7 +23,14 @@
 
 __all__ = ["Breakpoint", "While1"]
 
+# For unit testing always load this version, not the one installed.
+if __name__ == '__main__':
+    import sys, os.path
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+
 from shellgen import Dynamic, Static
+
+#------------------------------------------------------------------------------
 
 class Breakpoint (Dynamic):
     encoding = "nullfree"
@@ -31,9 +38,21 @@ class Breakpoint (Dynamic):
     def __init__(self, size = 1):
         self.size = size
 
-    def compile(self, variables = None):
-        self._bytes = "\xCC" * self.size
+    def compile(self, *argv, **argd):
+        return "\xcc" * self.size
 
 class While1 (Static):
     encoding = "nullfree"
     bytes = "\xeb\xfe"  # jmp short $-2
+
+#------------------------------------------------------------------------------
+
+# Unit test.
+if __name__ == '__main__':
+    assert Breakpoint.arch == "x86"
+    assert Breakpoint.os == "any"
+    assert While1.arch == "x86"
+    assert While1.os == "any"
+    assert Breakpoint(1).bytes == "\xcc"
+    assert Breakpoint(0x100).bytes == "\xcc" * 0x100
+    assert While1().bytes == "\xeb\xfe"

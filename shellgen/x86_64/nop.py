@@ -21,9 +21,12 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA 02110-1301, USA.
 
-__all__ = ["Nop"]
+# No unit test here.
+if __name__ == '__main__':
+    import sys
+    sys.exit(0)
 
-from shellgen.x86.nop import Nop_x86
-
-class Nop (Nop_x86):
-    pass
+from shellgen.x86.nop import *
+from shellgen.x86.nop import __all__
+from shellgen.base import copy_classes
+copy_classes(__all__, __name__, vars())
