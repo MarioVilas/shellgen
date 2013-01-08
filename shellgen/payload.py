@@ -39,12 +39,18 @@ __all__ = [
     # Stagers.
 ]
 
+# For unit testing always load this version, not the one installed.
+if __name__ == '__main__':
+    import sys, os.path
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
+
 from base import *
 
 # NOTE: all methods here must invoke the compile() method before returning the
 # shellcode object, so if there are any errors they show up immediately.
 
-##############################################################################
+###############################################################################
 ## Actions.
 
 def shell(arch, os, **options):
@@ -230,7 +236,7 @@ def chmod(arch, os, **options):
     """
     raise NotImplementedError()
 
-##############################################################################
+###############################################################################
 ## Encoders.
 
 def xor_encode(payload, bad_chars = "\0\r\n\x1a\"'`%,;:."):
@@ -367,3 +373,15 @@ def unicode_encode(payload, allow_upper = True,
         requested architecture, operating system or specified options.
     """
     raise NotImplementedError()
+
+###############################################################################
+## Unit test.
+
+if __name__ == '__main__':
+    from shellgen import *
+    def test():
+
+        # TODO
+        pass
+
+    test()

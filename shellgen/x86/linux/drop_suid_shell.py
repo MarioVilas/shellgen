@@ -31,7 +31,6 @@ from shellgen import Static
 class DropSuidShell (Static):
     provides  = "root"
     qualities = ("payload", "stack_balanced")
-    encoding  = "term_null"
 
     bytes = (
 

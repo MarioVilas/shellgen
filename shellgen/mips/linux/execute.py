@@ -34,8 +34,13 @@ class Execute (Dynamic):
 
     def __init__(self, command):
         self.command = command
+        if "\x00" in command:
+            raise ValueError("Cannot have null chars in command: %r" % command)
 
     def compile(self, *argv, **argd):
+        command = self.command
+        if "\x00" in command:
+            raise ValueError("Cannot have null chars in command: %r" % command)
         return (
             "\x04\x10\xff\xff"             #  bltzal  $zero,<_shellcode>
             "\x24\x02\x03\xf3"             #  li      $v0,1011

@@ -32,19 +32,19 @@ class Exit (Static):
 
     def __init__(self, exitcode = None):
 
-        bytes  = "\x6A\x01"         # push 0x01
-        bytes += "\x58"             # pop eax
+        # with exitcode: 7 ~ 8 bytes.
+        # without exitcode: 5 bytes.
+
+        bytes  = "\x6a\x01"                             # push 0x01
+        bytes += "\x58"                                 # pop eax
 
         if exitcode is not None:
             if exitcode == 0:
-                bytes += "\x31\xDB" # xor ebx, ebx
-            elif exitcode == 1:
-                bytes += "\x31\xDB" # xor ebx, ebx
-                bytes += "\x43"     # inc ebx
-            elif exitcode == -1:
-                bytes += "\x31\xDB" # xor ebx, ebx
-                bytes += "\x4b"     # dec ebx
+                bytes += "\x31\xdb"                     # xor ebx, ebx
+            else:
+                bytes += "\x6a" + pack("b", exitcode)   # push exitcode
+                bytes += "\x5b"                         # pop ebx
 
-        bytes += "\xCD\x80"         # int 0x80
+        bytes += "\xcd\x80"                             # int 0x80
 
         self.bytes = bytes

@@ -21,16 +21,22 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA 02110-1301, USA.
 
-__all__ = ["GetPC", "GetPC_Alt", "GetPC_FPU", "GetPC_Stub"]
-
-from shellgen import Dynamic, Decorator
+__all__ = ["GetPC", "GetPC_Alt", "GetPC_FPU", "GetPC_Wrapper"]
 
 from struct import pack
+
+# For unit testing always load this version, not the one installed.
+if __name__ == '__main__':
+    import sys, os.path
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+
+from shellgen import Dynamic, Decorator
 
 # Classic GetPC implementation using a jump and a call.
 class GetPC (Dynamic):
     provides  = "pc"
     encoding  = "nullfree"
+    length    = 10
 
     def __init__(self, pcreg = "ecx"):
         self.pcreg = pcreg
@@ -38,7 +44,7 @@ class GetPC (Dynamic):
     def compile(self, state):
 
         # Jump forward to the call instruction.
-        jmp_f = "\xEB\x02"
+        jmp_f = "\xEB\x03"
 
         # Pop the return address from the stack.
         pop = {
@@ -76,7 +82,7 @@ class GetPC (Dynamic):
             raise ValueError("Invalid target register: %s" % pcreg)
 
         # Build the shellcode.
-        bytes = jmp_f + pop[pcreg] + push[pcreg] + ret + call_b[pcreg]
+        bytes = jmp_f + pop[pcreg] + push[pcreg] + ret + call_b
 
         # Update the compilation state.
         state.current["pc"] = pcreg
@@ -94,16 +100,17 @@ class GetPC (Dynamic):
 class GetPC_Alt (Dynamic):
     provides  = "pc"
     encoding  = "nullfree"
+    length    = 10
 
     def __init__(self, pcreg = "ecx"):
         self.pcreg = pcreg
 
     def compile(self, state):
 
-        # This "call -1" instruction jumps on the last byte of itself, so the
+        # This "call $+4" instruction jumps on the last byte of itself, so the
         # next instruction uses an alternate encoding of the "dec" instruction
         # to decrement a harmless register.
-        call_m1 = "\xEB\xFF\xFF\xFF\xFF"
+        call_m1 = "\xE8\xFF\xFF\xFF\xFF"
 
         # Alternate encoding for "dec", the first byte must be \xFF.
         dec_alt = {
@@ -175,6 +182,7 @@ class GetPC_Alt (Dynamic):
 class GetPC_FPU (Dynamic):
     provides  = "pc"
     encoding  = "nullfree"
+    length    = 10
 
     def __init__(self, pcreg = "ecx"):
         self.pcreg = pcreg
@@ -219,17 +227,15 @@ class GetPC_FPU (Dynamic):
 
 ##############################################################################
 
-# This one is meant to be used by other shellcodes. It wraps decoder stubs by
-# providing them the address of their payload. That way you can write decoders
-# that don't need to be concatenated after a GetPC.
-#
-# Note: the decoder stub MUST clean up the stack or this won't work!
-class GetPC_Stub (Decorator):
+# This one wraps shellcodes by providing them the address of their payload.
+# The child shellcode MUST be stack balanced.
+# Adds 10 bytes to the shellcode.
+class GetPC_Wrapper (Decorator):
     provides  = "pc"
     encoding  = "nullfree"
 
     def __init__(self, stub, pcreg = "ecx"):
-        super(GetPC_Stub, self).__init__(stub)
+        super(GetPC_Wrapper, self).__init__(stub)
         self.pcreg = pcreg
 
     def compile(self, state):
@@ -280,7 +286,7 @@ class GetPC_Stub (Decorator):
             raise ValueError("Decoder stub must be stack balanced")
 
         # ASM: Jump to the call instruction.
-        jmp_f = "\xEB" + pack("b", len(bytes) + 2)
+        jmp_f = "\xEB" + pack("b", len(bytes) + 3)
 
         # ASM: Pop the return address from the stack.
         pop_pc = pop[pcreg]
@@ -297,5 +303,59 @@ class GetPC_Stub (Decorator):
         # Build the shellcode.
         bytes = jmp_f + pop_pc + push_pc + bytes + ret + call_b
 
+        # Check the bytecode for nulls.
+        if state.requires_nullfree() and "\x00" in bytes:
+            raise RuntimeError("Cannot compile without nulls")
+
         # Return the bytecode.
         return bytes
+
+#-----------------------------------------------------------------------------#
+
+# Unit test.
+if __name__ == '__main__':
+
+    # This is for manual testing.
+##    open("GetPC.bin","wb").write(GetPC().bytes)
+##    open("GetPC_Alt.bin","wb").write(GetPC_Alt().bytes)
+##    open("GetPC_FPU.bin","wb").write(GetPC_FPU().bytes)
+##    from shellgen.x86.debug import Breakpoint
+##    open("GetPC_Wrapper.bin","wb").write(GetPC_Wrapper(Breakpoint()).bytes)
+
+    from shellgen import Raw, CompilerState
+
+    def test(clazz):
+        shellcode = clazz()
+        assert shellcode.length == len(shellcode.bytes)
+        assert "\x00" not in shellcode.bytes
+
+    test(GetPC)
+    test(GetPC_Alt)
+    test(GetPC_FPU)
+
+    assert GetPC.length == GetPC_Alt.length == GetPC_FPU.length
+
+    try:
+        GetPC_Wrapper(Raw("this is a test")).bytes
+        assert False
+    except ValueError:
+        pass
+    test_shellcode = Raw("this is a test", qualities="stack_balanced")
+    test_wrapper = GetPC_Wrapper(test_shellcode)
+    state = CompilerState()
+    state.shared["encoding"] = "nullfree"
+    test_wrapper.compile(state)
+    assert test_wrapper.length == len(test_wrapper.bytes)
+    assert "\x00" not in test_wrapper.bytes
+    assert test_wrapper.length > test_shellcode.length
+    assert test_wrapper.length == GetPC.length + test_shellcode.length
+
+    test_shellcode = Raw("this has a null\0", qualities="stack_balanced")
+    test_wrapper = GetPC_Wrapper(test_shellcode)
+    state = CompilerState()
+    state.shared["encoding"] = "nullfree"
+    try:
+        test_wrapper.compile(state)
+        assert False
+    except RuntimeError:
+        pass

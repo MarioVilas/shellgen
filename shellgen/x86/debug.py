@@ -33,7 +33,8 @@ from shellgen import Dynamic, Static
 #------------------------------------------------------------------------------
 
 class Breakpoint (Dynamic):
-    encoding = "nullfree"
+    qualities = "stack_balanced"
+    encoding  = "nullfree"
 
     def __init__(self, size = 1):
         self.size = size
@@ -42,8 +43,11 @@ class Breakpoint (Dynamic):
         return "\xcc" * self.size
 
 class While1 (Static):
-    encoding = "nullfree"
-    bytes = "\xeb\xfe"  # jmp short $-2
+    qualities = "stack_balanced"
+    encoding  = "nullfree"
+
+    bytes  = "\xeb\xfe"  # jmp short $-2
+    length = 2
 
 #------------------------------------------------------------------------------
 
@@ -53,6 +57,7 @@ if __name__ == '__main__':
     assert Breakpoint.os == "any"
     assert While1.arch == "x86"
     assert While1.os == "any"
-    assert Breakpoint(1).bytes == "\xcc"
-    assert Breakpoint(0x100).bytes == "\xcc" * 0x100
-    assert While1().bytes == "\xeb\xfe"
+    assert While1().bytes == While1.bytes
+    assert While1().length == While1.length
+    assert Breakpoint(0x100).length == 0x100
+    assert Breakpoint(0x100).bytes == Breakpoint(1).bytes * 0x100

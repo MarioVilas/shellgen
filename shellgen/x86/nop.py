@@ -35,7 +35,8 @@ from shellgen import Dynamic, Decorator
 # TODO: randomized NOP sleds, encoding
 
 class Nop (Dynamic):
-    encoding = "nullfree"
+    qualities = "no_stack, stack_balanced, preserve_registers"
+    encoding  = "nullfree, lower, upper"
 
     def __init__(self, size = 1):
         self.size = size
@@ -46,7 +47,6 @@ class Nop (Dynamic):
 #------------------------------------------------------------------------------
 
 class Padder (Decorator):
-    encoding = "nullfree"
 
     def __init__(self, child, size):
         super(Padder, self).__init__(child)
@@ -89,6 +89,24 @@ class Padder (Decorator):
 
 # Unit test.
 if __name__ == '__main__':
+
+    assert Nop(1).length == 1
+    assert Nop(0x100).length == 0x100
+    assert Nop(1).length == len(Nop(1).bytes)
+    assert Nop(0x100).length == len(Nop(0x100).bytes)
+
+    padder_right = Padder("<here goes the child>", 100)
+    assert padder_right.length == len(padder_right.bytes)
+    assert padder_right.length == 100
+    assert padder_right.bytes.endswith("<here goes the child>")
+
+    padder_left = Padder("<here goes the child>", -100)
+    assert padder_left.length == len(padder_left.bytes)
+    assert padder_left.length == 100
+    assert padder_left.bytes.startswith("<here goes the child>")
+
+    # These won't work when randomized nop sleds are supported.
+    assert Nop(0x100).bytes == Nop(1).bytes * 0x100
     assert Nop(1).bytes == "\x90"
     assert Nop(0x100).bytes == "\x90" * 0x100
     assert Padder("<here goes the child>", 100).bytes == ("\x90" * 79) + "<here goes the child>"

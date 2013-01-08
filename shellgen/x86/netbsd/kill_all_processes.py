@@ -27,8 +27,6 @@ __all__ = ["KillAllProcesses"]
 from shellgen import Static
 
 class KillAllProcesses (Static):
-    encoding = "nullfree"
-
     bytes = (
 
         # int sys_kill(int pid, int signum);
