@@ -244,9 +244,11 @@ class meta_shellcode_final(meta_shellcode):
         super(meta_shellcode_final, cls).__init__(name, bases, namespace)
 
 class meta_shellcode_static(meta_shellcode):
-    "Makes sure the user wasn't so crazy to have compile() in a Static."
+    "Same as L{meta_shellcode} but specifically for static shellcodes."
     def __init__(cls, name, bases, namespace):
         super(meta_shellcode_static, cls).__init__(name, bases, namespace)
+
+        # Make sure the user wasn't so crazy to have compile() in a Static.
         if cls.__module__ != __name__ and cls.compile not in (
                     getattr(b, "compile", None) for b in cls.__bases__):
             msg = (
@@ -255,6 +257,10 @@ class meta_shellcode_static(meta_shellcode):
                 " *Slap in the wrist*"
             ) % cls.__name__
             raise TypeError(msg)
+
+        # Autodetect encoding if missing or empty.
+        if not cls.encoding and not isinstance(cls.bytes, property):
+            cls.encoding = autodetect_encoding(cls.bytes)
 
 class meta_shellcode_raw(meta_shellcode_static):
     "Combination of L{meta_shellcode_static} and L{meta_shellcode_final}."
@@ -616,6 +622,10 @@ class CompilerState (object):
         to this piece, but only to this piece.
     """
     def __init__(self):
+        self.reset()
+
+    def reset(self):
+        "Reset the state."
         self.shared   = {}
         self.current  = {}
         self.previous = {}
@@ -1274,7 +1284,82 @@ class Concatenator (Container):
 #-----------------------------------------------------------------------------#
 
 class Decorator (Container):
-    "Decorators wrap around a shellcode to modify its compilation."
+    """
+    Decorators wrap around a shellcode to modify its compilation.
+
+    @note: By default, the metadata of a Decorator instance is combined with
+        that of the Shellcode it wraps. The platform is inherited if in the
+        class it's declared to be C{"any"}, encodings are intersected and other
+        properties are united. For example::
+
+            >>> import shellgen
+            >>> class ExampleShellcode (shellgen.Static):
+            ...     os = "windows"
+            ...     provides = "payload"
+            ...     encoding = "lower, ascii, nullfree"
+            ...
+            >>> class ExampleDecorator (shellgen.Decorator):
+            ...     os = "any"
+            ...     provides = "pc"
+            ...     encoding = "alpha, ascii, nullfree"
+            ...
+            >>> print ExampleDecorator( ExampleShellcode() ).os
+            'windows'
+            >>> print ExampleDecorator( ExampleShellcode() ).provides
+            ('payload', 'syscall')
+            >>> print ExampleDecorator( ExampleShellcode() ).encoding
+            ('ascii', 'nullfree')
+
+        To override this behavior, you can set the metadata in the constructor
+        of your subclass, for example like this::
+
+            class ExampleDecorator (shellgen.Decorator):
+
+                # Class metadata describes the code added
+                # by the decorator itself, independently of its child.
+                arch = "x86"
+                os = "windows"
+                requires = "pc, syscall"
+                qualities = "stack_exec, uses_seh"
+
+                def __init__(self, child):
+                    super(MyDecorator, self).__init__(child)
+
+                    # This forces instances to use the metadata of the class.
+                    self.arch      = MyDecorator.arch
+                    self.os        = MyDecorator.os
+                    self.requires  = MyDecorator.requires
+                    self.provides  = MyDecorator.provides
+                    self.qualities = MyDecorator.qualities
+                    self.encoding  = MyDecorator.encoding
+
+        You can use the same trick to make the Decorator transparently mirror
+        the metadata of the child, like this::
+
+            class ExampleDecorator (shellgen.Decorator):
+                def __init__(self, child):
+                    super(MyDecorator, self).__init__(child)
+
+                    # This forces instances to copy the metadata of the child.
+                    self.arch      = child.arch
+                    self.os        = child.os
+                    self.requires  = child.requires
+                    self.provides  = child.provides
+                    self.qualities = child.qualities
+                    self.encoding  = child.encoding
+
+        Or you can define property methods instead::
+
+            class ExampleDecorator (shellgen.Decorator):
+
+                @property
+                def encoding(self):
+
+                    # For example, we would copy the encoding.
+                    # This would work even if the child changes its encoding
+                    # later on runtime.
+                    return self.child
+    """
 
     def __init__(self, child):
         """
@@ -1282,6 +1367,61 @@ class Decorator (Container):
         @param child: Shellcode whose compilation will be modified.
         """
         super(Decorator, self).__init__(child)
+
+    # Dark magic to implement the metadata combination feature.
+    def __getattribute__(self, name):
+
+        # Get the super getattribute method.
+        getattribute = super(Decorator, self).__getattribute__
+
+        # Get the dictionary of instance variables.
+        # This excludes the variables defined in the class.
+        instance_vars = object.__getattribute__(self, "__dict__")
+
+        # Try to get the value from the instance.
+        try:
+            value = instance_vars[name]
+
+        # If it's not defined in the instance, do the dark magic...
+        except KeyError:
+
+            # Get the value using the normal lookup.
+            # This includes values defined in the class and decorators.
+            try:
+                value = getattribute(name)
+            except AttributeError:
+                value = None
+
+            # If the value was obtained through a property method,
+            # return it unmodified.
+            try:
+                clazz = getattribute('__class__')
+                if type(getattr(clazz, name)) == property:
+                    return value
+            except AttributeError:
+                pass
+
+            # The platform is inherited from the child only when the class
+            # defines it as "any".
+            if name in ("arch", "os") and value == "any":
+                child = getattribute("child")
+                value = getattr(child, name)
+
+            # The encoding is intersected, the rest of the metadata properties
+            # are united.
+            elif name in ("requires", "provides", "qualities", "encoding"):
+                child = getattribute("child")
+                value = meta_canonicalize_tags(value)
+                child_value = getattr(child, name)
+                child_value = meta_canonicalize_tags(child_value)
+                if name == "encoding":
+                    value = set(value).intersection(child_value)
+                else:
+                    value = value + child_value
+                value = meta_canonicalize_tags(value)
+
+        # Return the calculated value.
+        return value
 
     @property
     def child(self):
@@ -1302,9 +1442,46 @@ class Decorator (Container):
 
 class Encoder (Decorator):
     """
-    Encoders wrap around ashellcode to pass encoding restrictions, for example
+    Encoders wrap around a shellcode to pass encoding restrictions, for example
     ASCII character filters or Unicode codepage conversions.
+
+    @note: Metadata is combined with that of the child, like it happens for
+        the L{Decorator} class, B{except} for the C{encoding} property which
+        is overriden by default.
+
+        For example::
+
+            >>> import shellgen
+            >>> class ExampleShellcode (shellgen.Static):
+            ...     arch = "x86"
+            ...     os = "linux"
+            ...     provides = "payload"
+            ...     encoding = "term_null"
+            ...
+            >>> class ExampleEncoder (shellgen.Decorator):
+            ...     arch = "x86"
+            ...     os = "any"
+            ...     encoding = "alpha, nullfree"
+            ...
+            >>> print ExampleEncoder( ExampleShellcode() ).arch
+            'x86'
+            >>> print ExampleEncoder( ExampleShellcode() ).os
+            'linux'
+            >>> print ExampleEncoder( ExampleShellcode() ).provides
+            ('payload')
+            >>> print ExampleEncoder( ExampleShellcode() ).encoding
+            ('alpha', 'nullfree')
     """
+
+    # Encoder classes should always override the "encoding" property instead of
+    # inheriting it from its child. They may choose to do the same with the
+    # rest of the metadata, depending on what the decoder stub does.
+    def __getattribute__(self, name):
+        if name == "encoding":
+            value = object.__getattribute__(self, "encoding")
+        else:
+            value = super(Encoder, self).__getattribute__(name)
+        return value
 
     def compile(self, state):
         raise NotImplementedError(
