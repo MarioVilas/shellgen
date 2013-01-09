@@ -1158,43 +1158,26 @@ class Encoder (Decorator):
     Encoders wrap around a shellcode to pass encoding restrictions, for example
     ASCII character filters or Unicode codepage conversions.
 
-    @note: Metadata is combined with that of the child, like it happens for
-        the L{Decorator} class, B{except} for the C{encoding} property which
-        is overriden by default.
+    @note: Encoders always override the encoding of their child.
 
         For example::
 
             >>> import shellgen
             >>> class ExampleShellcode (shellgen.Static):
-            ...     arch = "x86"
-            ...     os = "linux"
-            ...     provides = "payload"
-            ...     encoding = "term_null"
+            ...     encoding = ('term_null',)
             ...
-            >>> class ExampleEncoder (shellgen.Decorator):
-            ...     arch = "x86"
-            ...     os = "any"
-            ...     encoding = "alpha, nullfree"
+            >>> class ExampleEncoder (shellgen.Encoder):
+            ...     encoding = ('alpha', 'nullfree')
             ...
-            >>> print ExampleEncoder( ExampleShellcode() ).arch
-            'x86'
-            >>> print ExampleEncoder( ExampleShellcode() ).os
-            'linux'
-            >>> print ExampleEncoder( ExampleShellcode() ).provides
-            ('payload')
+            >>> print ExampleShellcode().encoding
+            ('term_null',)
             >>> print ExampleEncoder( ExampleShellcode() ).encoding
             ('alpha', 'nullfree')
     """
 
-    # Encoder classes should always override the "encoding" property instead of
-    # inheriting it from its child. They may choose to do the same with the
-    # rest of the metadata, depending on what the decoder stub does.
-    def __getattribute__(self, name):
-        if name == "encoding":
-            value = object.__getattribute__(self, "encoding")
-        else:
-            value = super(Encoder, self).__getattribute__(name)
-        return value
+    # Encoder instances don't inherit the encoding of the child.
+    __getattribute__ = object.__getattribute__
+    encoding = ()
 
     def compile(self, state):
         raise NotImplementedError(
@@ -1203,12 +1186,21 @@ class Encoder (Decorator):
 #-----------------------------------------------------------------------------#
 
 class Stager (Dynamic):
-    "Stagers split shellcode execution into load stages."
+    """
+    Stagers split shellcode execution into load stages.
+
+    @type next_stage: L{Shellcode}
+    @ivar next_stage: Next load stage.
+    """
 
     # Updated on object instances.
     _next_stage = None
 
     def __init__(self, next_stage):
+        """
+        @type  next_stage: L{Shellcode}
+        @param next_stage: Next load stage.
+        """
         self._next_stage = next_stage
 
     @property
@@ -1327,6 +1319,14 @@ if __name__ == '__main__':
                 self.encoding = ExampleContainer.encoding
         assert ExampleContainer( ExampleShellcode() ).encoding == \
                                      ExampleContainer.encoding
+
+        # Test encoding overriding for Encoder shellcodes.
+        class ExampleShellcode (Static):
+            encoding = ('term_null',)
+        class ExampleEncoder (Encoder):
+            encoding = ('nullfree',)
+        assert ExampleShellcode().encoding == ('term_null',)
+        assert ExampleEncoder( ExampleShellcode() ).encoding == ('nullfree',)
 
         # Test the platform metadata.
         class TestArchAny(Static):
@@ -1629,5 +1629,8 @@ if __name__ == '__main__':
         assert tmp1 != test_rnd1.bytes
         assert tmp2 != test_rnd2.bytes
         assert tmp3 != test_rnd3.bytes
+
+        # Test stage inheritance.
+        # XXX TODO
 
     test()
