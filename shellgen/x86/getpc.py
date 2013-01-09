@@ -31,6 +31,7 @@ if __name__ == '__main__':
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from shellgen import Dynamic, Decorator
+from shellgen.util import is_stack_balanced
 
 # Classic GetPC implementation using a jump and a call.
 class GetPC (Dynamic):
@@ -234,8 +235,8 @@ class GetPC_Wrapper (Decorator):
     provides  = "pc"
     encoding  = "nullfree"
 
-    def __init__(self, stub, pcreg = "ecx"):
-        super(GetPC_Wrapper, self).__init__(stub)
+    def __init__(self, child, pcreg = "ecx"):
+        super(GetPC_Wrapper, self).__init__(child)
         self.pcreg = pcreg
 
     def compile(self, state):
@@ -279,11 +280,11 @@ class GetPC_Wrapper (Decorator):
 
         # Check the decoder stub doesn't exceed the maximum size.
         if len(bytes) > 128:
-            raise ValueError("Decoder stub is larger than 128 bytes")
+            raise RuntimeError("Child is larger than 128 bytes")
 
         # Check the child is stack balanced.
-        if "stack_balanced" not in self.child.qualities:
-            raise ValueError("Decoder stub must be stack balanced")
+        if not is_stack_balanced(self.child):
+            raise RuntimeError("Child must be stack balanced")
 
         # ASM: Jump to the call instruction.
         jmp_f = "\xEB" + pack("b", len(bytes) + 3)
@@ -338,7 +339,7 @@ if __name__ == '__main__':
     try:
         GetPC_Wrapper(Raw("this is a test")).bytes
         assert False
-    except ValueError:
+    except RuntimeError:
         pass
     test_shellcode = Raw("this is a test", qualities="stack_balanced")
     test_wrapper = GetPC_Wrapper(test_shellcode)
@@ -356,6 +357,32 @@ if __name__ == '__main__':
     state.shared["encoding"] = "nullfree"
     try:
         test_wrapper.compile(state)
+        assert False
+    except RuntimeError:
+        pass
+    test_wrapper.compile()
+    assert "nullfree" not in test_wrapper.encoding
+
+    test_shellcode1 = Raw("this is a test", qualities="stack_balanced")
+    test_shellcode2 = Raw("this is a test", qualities="no_stack")
+    test_shellcode = test_shellcode1 + test_shellcode2
+    test_wrapper = GetPC_Wrapper(test_shellcode)
+    assert test_wrapper.length == GetPC.length + (len("this is a test") * 2)
+
+    test_shellcode1 = Raw("this is a test", qualities="no_stack")
+    test_shellcode2 = test_shellcode1 + Raw("this is a test")
+    test_shellcode = test_shellcode2 + Raw("this is a test", qualities="stack_balanced")
+    test_wrapper = GetPC_Wrapper(test_shellcode)
+    try:
+        test_wrapper.compile()
+        assert False
+    except RuntimeError:
+        pass
+
+    test_shellcode = Raw("A" * 0x1000, qualities="stack_balanced")
+    test_wrapper = GetPC_Wrapper(test_shellcode)
+    try:
+        test_wrapper.compile()
         assert False
     except RuntimeError:
         pass

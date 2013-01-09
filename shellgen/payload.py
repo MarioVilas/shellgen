@@ -43,9 +43,13 @@ __all__ = [
 if __name__ == '__main__':
     import sys, os.path
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
 
-from base import *
+    # Now do an absolute import.
+    from shellgen.base import *
+
+# Otherwise do a relative import.
+else:
+    from base import *
 
 # NOTE: all methods here must invoke the compile() method before returning the
 # shellcode object, so if there are any errors they show up immediately.

@@ -21,5 +21,21 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA 02110-1301, USA.
 
+"""
+ShellGen - Shellcode generator library
+
+@type version: float
+@var  version: Library version.
+"""
+
 from base import *
-__all__ = base.__all__
+
+__all__ = [
+    "version",
+    "ShellcodeWarning",
+    "CompilerState",
+    "Shellcode", "Dynamic", "Static", "Raw",
+    "Container", "Concatenator", "Decorator", "Encoder", "Stager",
+]
+
+version = 0.1

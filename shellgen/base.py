@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 ###############################################################################
-## ShellGen - Shellcode generator library                                    ##
+## Core features of ShellGen                                                 ##
 ###############################################################################
 
 # Copyright (c) 2012-2013 Mario Vilas
@@ -21,27 +21,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA 02110-1301, USA.
 
-"""
-ShellGen - Shellcode generator library
-
-@type version: float
-@var  version: Library version.
-
-@type default_bad_chars: str
-@var  default_bad_chars: Default list of bad characters for encoders.
-"""
-
-__all__ = [
-    "version",
-    "ShellcodeWarning",
-    "get_shellcode_class", "get_available_platforms",
-    "find_bad_chars", "default_bad_chars", "good_chars", "random_chars",
-    "CompilerState",
-    "Shellcode", "Dynamic", "Static", "Raw",
-    "Container", "Concatenator", "Decorator", "Encoder", "Stager",
-]
-
-version = "0.1"
+"Core features of ShellGen."
 
 import sys
 import random
@@ -71,20 +51,29 @@ else:
         msg = "Trying to load %s outside of its package" % __file__
         raise ImportError(msg)
 
+#-----------------------------------------------------------------------------#
+
 # This method may be a little paranoid, but better safe than sorry!
 def is_valid_module_path_component(token):
     "Validate strings to be used when importing modules dynamically."
     return not token.startswith("_") and not keyword.iskeyword(token) and \
         all( ( (x.isalnum() or x == "_") for x in token ) )
 
-def meta_canonicalize_arch(arch, os, classname = None):
-    "Canonicalizes arch and os. See L{meta_canonicalize}."
+def meta_canonicalize_platform_tag(tag):
+    "Canonicalizes the processor architecture. See L{meta_canonicalize}."
+    if not tag:
+        tag = "any"
+    else:
+        tag = tag.strip().lower()
+    return tag
+
+def meta_canonicalize_platform(arch, os, classname = None):
+    "Canonicalizes and validates arch and os. See L{meta_canonicalize}."
 
     # Validate the processor architecture.
     if not isinstance(arch, property):
-        if not arch:
-            arch = "any"
-        elif not is_valid_module_path_component(arch):
+        arch = meta_canonicalize_platform_tag(arch)
+        if not is_valid_module_path_component(arch):
             if classname:
                 msg = "Bad processor architecture in %s: %r"
                 msg = msg % (classname, arch)
@@ -92,14 +81,11 @@ def meta_canonicalize_arch(arch, os, classname = None):
                 msg = "Bad processor architecture: %r"
                 msg = msg % arch
             raise ValueError(msg)
-        else:
-            arch = arch.strip().lower()
 
     # Validate the operating system.
     if not isinstance(os, property):
-        if not os:
-            os = "any"
-        elif not is_valid_module_path_component(os):
+        os = meta_canonicalize_platform_tag(os)
+        if not is_valid_module_path_component(os):
             if classname:
                 msg = "Bad operating system in %s: %r"
                 msg = msg % (classname, os)
@@ -107,8 +93,6 @@ def meta_canonicalize_arch(arch, os, classname = None):
                 msg = "Bad operating system: %r"
                 msg = msg % os
             raise ValueError(msg)
-        else:
-            os = os.strip().lower()
 
     return arch, os
 
@@ -154,7 +138,7 @@ def meta_canonicalize(cls):
         clsname = cls.__name__              # class
     except AttributeError:
         clsname = cls.__class__.__name__    # instance
-    cls.arch, cls.os = meta_canonicalize_arch(cls.arch, cls.os, clsname)
+    cls.arch, cls.os = meta_canonicalize_platform(cls.arch, cls.os, clsname)
 
     # Canonicalize the tags.
     fix_tags = meta_canonicalize_tags
@@ -193,6 +177,57 @@ def meta_autodetect_platform(cls):
         while len(tokens) < 2:
             tokens.append("any")
     cls.arch, cls.os = tokens
+
+def meta_autodetect_encoding(bytes):
+    """
+    Tries to autodetect the encoding of the given shellcode bytes.
+
+    Currently the following encodings are detected:
+     - C{term_null}
+     - C{nullfree}
+     - C{ascii}
+     - C{alpha}
+     - C{lower}
+     - C{upper}
+     - C{unicode}
+
+    @note: The detection for Unicode is only for shellcodes encoded using the
+        Venetian technique. It cannot tell if the shellcode would actually
+        survive the codepage translation.
+
+    @type  bytes: str
+    @param bytes: Compiled bytecode to test for encodings.
+
+    @rtype:  tuple(str)
+    @return: Encoding constraints for this shellcode.
+    """
+    encoding = []
+    if isinstance(bytes, Shellcode):
+        bytes = bytes.bytes
+    if not bytes:
+        bytes = ""
+    if "\x00" not in bytes:
+        encoding.append("nullfree")
+    elif bytes.endswith("\x00") and "\x00" not in bytes[:-1]:
+        encoding.append("term_null")
+    try:
+        if bytes == bytes.encode("ascii"):
+            encoding.append("ascii")
+            if all( ((x == "\x00" or x.isalnum()) for x in bytes) ):
+                encoding.append("alpha")
+    except Exception:
+        pass
+    if bytes == bytes.lower():
+        encoding.append("lower")
+    if bytes == bytes.upper():
+        encoding.append("upper")
+    if len(bytes) & 1 == 0:
+        if all( ( bytes[i] == "\x00" for i in xrange(1, len(bytes), 2) ) ):
+            encoding.append("unicode")
+            if bytes.endswith("\x00\x00") and not all(
+                (bytes[i] == "\x00" for i in xrange(0, len(bytes), 2) ) ):
+                    encoding.append("term_null")
+    return tuple(sorted(encoding))
 
 def meta_compile(compile):
     "Wraps the compile() method to do dark magic, see L{meta_shellcode}."
@@ -260,7 +295,7 @@ class meta_shellcode_static(meta_shellcode):
 
         # Autodetect encoding if missing or empty.
         if not cls.encoding and not isinstance(cls.bytes, property):
-            cls.encoding = autodetect_encoding(cls.bytes)
+            cls.encoding = meta_autodetect_encoding(cls.bytes)
 
 class meta_shellcode_raw(meta_shellcode_static):
     "Combination of L{meta_shellcode_static} and L{meta_shellcode_final}."
@@ -314,289 +349,10 @@ def copy_classes(all, name, namespace):
             # Save the new class in the module namespace.
             namespace[classname] = clazz
 
-def print_shellcode_tree(shellcode, indent = 0):
-    """
-    Helper function to show the shellcode object tree.
-
-    Useful for debugging.
-
-    @type  shellcode: L{Shellcode}
-    @param shellcode: Any shellcode.
-
-    @type  indent: int
-    @param indent: Indentation level.
-    """
-
-    # Make sure all we get are Shellcode instances.
-    if not isinstance(shellcode, Shellcode):
-        raise TypeError("Expected Shellcode, got %r instead" % type(shellcode))
-
-    # Calculate the indentation space we'll need.
-    space = "    " * (indent)
-
-    # Show the shellcode name and metadata.
-    print "%s%s" % (space, shellcode.__class__.__name__)
-    print "%s* Platform:  %s (%s)" % (space, shellcode.os, shellcode.arch)
-    if shellcode.requires:
-        print "%s* Requires:  %s" % (space, ", ".join(list(shellcode.requires)))
-    if shellcode.provides:
-        print "%s* Provides:  %s" % (space, ", ".join(list(shellcode.provides)))
-    if shellcode.qualities:
-        print "%s* Qualities: %s" % (space, ", ".join(list(shellcode.qualities)))
-    if shellcode.encoding:
-        print "%s* Encoding:  %s" % (space, ", ".join(list(shellcode.encoding)))
-
-    # Show the number of children and stages.
-    if shellcode.children:
-        print "%s* Children:  %d" % (space, len(shellcode.children))
-    if shellcode.stages:
-        print "%s* Stages:    %d" % (space, len(shellcode.stages))
-
-    # Show the shellcode bytes and length.
-    bytes = None
-    if isinstance(shellcode, Static):           # For static shellcodes,
-        bytes  = shellcode.bytes                #  get the bytes and length
-        length = shellcode.length               #  directly.
-    elif hasattr(shellcode, "_Dynamic__bytes"): # For dynamic shellcodes,
-        bytes = shellcode._Dynamic__bytes       #  get them from the cache.
-        if bytes:
-            length = len(bytes)
-        else:
-            length = 0
-    if bytes is not None:
-        if len(bytes) != length:
-            warnings.warn("Bad length for %s" % shellcode.__class__.__name__)
-        bytes = bytes.encode("hex")
-        if len(bytes) > 32:
-            bytes = bytes[:16] + "..." + bytes[-16:]
-        print "%s* Length:    %d" % (space, length)
-        if bytes:
-            print "%s* Bytes:     %s" % (space, bytes)
-
-    # Leave an empty line between shellcodes.
-    print
-
-    # Recursively show the children, indented.
-    indent += 1
-    for child in shellcode.children:
-        print_shellcode_tree(child, indent)
-
 #-----------------------------------------------------------------------------#
 
 class ShellcodeWarning (RuntimeWarning):
     "Warnings issued by this library are of this type."
-
-#-----------------------------------------------------------------------------#
-
-# Helper function to resolve shellcode classes dynamically.
-# This method is the reason why it's important to maintain consistent
-# names and interfaces across platforms throughout the library.
-def get_shellcode_class(arch, os, module, classname):
-    """
-    Get the requested shellcode class by classname, module, processor
-    architecture and operating system.
-
-    Tipically exploits would directly import the shellcode classes, but this
-    helper function is useful if for some reason the platform must be set
-    dynamically.
-
-    @type  arch: str
-    @param arch: Target processor architecture.
-        Must be C{None} or C{"any"} for platform independent shellcodes.
-
-    @type  os: str
-    @param os: Target operating system.
-        Must be C{None} or C{"any"} for OS independent shellcodes.
-
-    @type  module: str
-    @param module: Shellcode module name.
-
-    @type  classname: str
-    @param classname: Shellcode class name.
-
-    @rtype:  class
-    @return: Shellcode class.
-
-    @raise ValueError: Invalid arguments.
-    @raise NotImplementedError: The requested shellcode could not be found.
-    """
-
-    # Canonicalize the arch and os.
-    arch, os = meta_canonicalize_arch(arch, os)
-
-    # Validate the module and classname.
-    if not is_valid_module_path_component(module):
-        raise ValueError("Bad shellcode module: %r" % module)
-    if not is_valid_module_path_component(classname):
-        raise ValueError("Bad shellcode class: %r" % classname)
-
-    # Build the fully qualified module name.
-    if os == "any":
-        path = "shellgen.%s.%s" % (arch, module)
-    else:
-        path = "shellgen.%s.%s.%s" % (arch, os, module)
-
-    # Load the class and return it.
-    try:
-        clazz = getattr( __import__(path, fromlist = [classname]), classname )
-    except ImportError, e:
-        msg = "Error loading module %s: %s" % (path, str(e))
-        raise NotImplementedError(msg)
-    except AttributeError, e:
-        msg = "Error loading class %s.%s: %s" % (path, classname, str(e))
-        raise NotImplementedError(msg)
-    return clazz
-
-def get_available_platforms():
-    """
-    Get the list of available architectures from built-in shellcodes.
-
-    This operation involves accessing the filesystem, so you may want to cache
-    the response.
-
-    @rtype: list( tuple(str, str) )
-    @return: List of available architectures from built-in shellcodes.
-        Each element in the list is a tuple containing:
-         - processor architecture
-         - operating system
-    """
-    isdir  = path.isdir
-    isfile = path.isfile
-    join   = path.join
-    platform_list = []
-    for arch_name in listdir(base_dir):
-        if arch_name.startswith("."):
-            continue
-        arch_dir = join(base_dir, arch_name)
-        if not isdir(arch_dir) or not isfile(join(arch_dir, "__init__.py")):
-            continue
-        check_for_any = True
-        for os_name in listdir(arch_dir):
-            if os_name.startswith("."):
-                continue
-            os_dir = join(arch_dir, os_name)
-            if isdir(os_dir) and isfile(join(os_dir, "__init__.py")):
-                platform_list.append( (arch_name, os_name) )
-            elif check_for_any:
-                check_for_any = False
-                platform_list.append( (arch_name, "any") )
-    platform_list.sort()
-    return platform_list
-
-def autodetect_encoding(bytes):
-    """
-    Tries to autodetect the encoding of the given shellcode bytes.
-
-    Currently the following encodings are detected:
-     - C{term_null}
-     - C{nullfree}
-     - C{ascii}
-     - C{alpha}
-     - C{lower}
-     - C{upper}
-     - C{unicode}
-
-    @note: The detection for Unicode is only for shellcodes encoded using the
-        Venetian technique. It cannot tell if the shellcode would actually
-        survive the codepage translation.
-
-    @type  bytes: str
-    @param bytes: Compiled bytecode to test for encodings.
-
-    @rtype:  tuple(str)
-    @return: Encoding constraints for this shellcode.
-    """
-    encoding = []
-    if isinstance(bytes, Shellcode):
-        bytes = bytes.bytes
-    if not bytes:
-        bytes = ""
-    if "\x00" not in bytes:
-        encoding.append("nullfree")
-    elif bytes.endswith("\x00") and "\x00" not in bytes[:-1]:
-        encoding.append("term_null")
-    try:
-        if bytes == bytes.encode("ascii"):
-            encoding.append("ascii")
-            if all( ((x == "\x00" or x.isalnum()) for x in bytes) ):
-                encoding.append("alpha")
-    except Exception:
-        pass
-    if bytes == bytes.lower():
-        encoding.append("lower")
-    if bytes == bytes.upper():
-        encoding.append("upper")
-    if len(bytes) & 1 == 0:
-        if all( ( bytes[i] == "\x00" for i in xrange(1, len(bytes), 2) ) ):
-            encoding.append("unicode")
-            if bytes.endswith("\x00\x00") and not all(
-                (bytes[i] == "\x00" for i in xrange(0, len(bytes), 2) ) ):
-                    encoding.append("term_null")
-    return tuple(sorted(encoding))
-
-def find_bad_chars(bytes, bad_chars = None):
-    """
-    Test the given bytecode against a list of bad characters.
-
-    @type  bytes: str
-    @param bytes: Compiled bytecode to test for bad characters.
-
-    @type  bad_chars: str
-    @param bad_chars: Bad characters to test.
-        Defaults to L{default_bad_chars}.
-
-    @rtype:  str
-    @return: Bad characters present in the bytecode.
-    """
-    if bad_chars is None:
-        bad_chars = default_bad_chars
-    return "".join( (c for c in bad_chars if c in bytes) )
-
-default_bad_chars = '\x00\t\n\r\x1a !"#$%&\'()+,./:;=[\\]`{|}'
-
-def good_chars(bad_chars = None):
-    """
-    Take a bad chars list and generate the opposite good chars list.
-
-    This can be useful for testing how the vulnerable program filters the
-    characters we feed it.
-
-    @type  bad_chars: str
-    @param bad_chars: Bad characters to test.
-        Defaults to L{default_bad_chars}.
-
-    @rtype:  str
-    @return: Good characters.
-    """
-    if bad_chars is None:
-        bad_chars = default_bad_chars
-    bad_list = set( map(ord, bad_chars) )
-    return "".join( (chr(c) for c in xrange(256) if c not in bad_list) )
-
-def random_chars(length, bad_chars = None):
-    """
-    Generate a string of random characters, avoiding bad characters.
-
-    This can be useful to randomize the payload of our exploits.
-
-    @type  length: int
-    @param length: How many characters to generate.
-
-    @type  bad_chars: str
-    @param bad_chars: Bad characters to test.
-        Defaults to L{default_bad_chars}.
-
-    @rtype:  str
-    @return: String of random characters.
-    """
-    if bad_chars is None:
-        bad_chars = default_bad_chars
-    c = good_chars(bad_chars)
-    if not c:
-        raise ValueError("All characters are bad!")
-    m = len(c) - 1
-    randint = random.randint
-    return "".join( ( c[randint(0, m)] for i in xrange(length) ) )
 
 #-----------------------------------------------------------------------------#
 
@@ -984,7 +740,7 @@ class Raw (Static):
 
         @type  encoding: list(str)
         @param encoding: Encoding constraints for this shellcode.
-            Autodetected by default, see: L{autodetect_encoding}.
+            Autodetected by default, see: L{util.autodetect_encoding}.
         """
         super(Raw, self).__init__()
 
@@ -1013,7 +769,7 @@ class Raw (Static):
         if encoding is not None:   self.encoding = encoding
         else:
             # Default for encoding is autodetection.
-            self.encoding = autodetect_encoding(bytes)
+            self.encoding = meta_autodetect_encoding(bytes)
 
         # Store the bytecode.
         self.bytes = bytes
@@ -1099,6 +855,48 @@ class Container (Dynamic):
     """
     Containers may hold one or more child shellcodes. When compiled, all of
     the child shellcodes are compiled as well.
+
+    @note: By default, the encoding of a Container instance is the intersection
+        if the encoding declared in the class with the encodings of its child
+        instances. For example::
+
+            >>> import shellgen
+            >>> class ExampleShellcode (shellgen.Static):
+            ...     encoding = ('unicode', 'nullfree')
+            ...
+            >>> class ExampleContainer (shellgen.Container):
+            ...     encoding = ('ascii', 'nullfree')
+            ...
+            >>> print ExampleContainer( ExampleShellcode() ).encoding
+            ('nullfree')
+
+        If the Container class doesn't declare any encoding, then only the
+        children's encodings are intersected::
+
+            >>> import shellgen
+            >>> class ExampleShellcode (shellgen.Static):
+            ...     encoding = ('ascii', 'nullfree')
+            ...
+            >>> class ExampleContainer (shellgen.Container):
+            ...     pass
+            ...
+            >>> print ExampleContainer( ExampleShellcode() ).encoding
+            ('ascii', 'nullfree')
+
+        To override this behavior, you can set the metadata in the constructor
+        of your subclass, for example like this::
+
+            class ExampleContainer (shellgen.Container):
+
+                # Encoding declared in the class describes the code added by
+                # the container itself, independently of the children.
+                encoding = ('ascii', 'nullfree')
+
+                def __init__(self, *children):
+                    super(ExampleContainer, self).__init__(*children)
+
+                    # This forces instances to use the encoding of the class.
+                    self.encoding = ExampleContainer.encoding
     """
 
     # Updated on object instances.
@@ -1124,6 +922,77 @@ class Container (Dynamic):
             self._children.append(child)
             previous._check_platform(child)
             previous = child
+
+    # Dark magic to implement the metadata combination feature.
+    def __getattribute__(self, name):
+
+        # Get the super getattribute method.
+        # Using it prevents an infinite recursion.
+        getattribute = super(Container, self).__getattribute__
+
+        # The dark magic is only for the "encoding" property.
+        # Use the normal lookup mechanism for everything else.
+        if name != "encoding":
+            return getattribute(name)
+
+        # Get the dictionary of instance variables.
+        # This excludes the variables defined in the class.
+        instance_vars = object.__getattribute__(self, "__dict__")
+
+        # If the value is defined as an instance variable,
+        # return it unmodified.
+        try:
+            return instance_vars[name]
+
+        # If it's a class variable, do the dark magic...
+        except KeyError:
+
+            # Get the value using the normal lookup.
+            # This works for both class variables and property methods.
+            try:
+                value = getattribute(name)
+            except AttributeError:
+                value = None
+
+            # If the value was obtained through a property method,
+            # return it unmodified.
+            clazz = getattribute('__class__')
+            property_type = type(getattr(clazz, name, None))
+            if issubclass(property_type, property):
+                return value
+
+            # When the Container subclass defines its own encoding,
+            # the class encoding is intersected with that of the children.
+            # This works because we have a property method in the base class,
+            # so we only reach this point if the subclass redefines it.
+            encoding = set( meta_canonicalize_tags(value) )
+            if encoding:
+                intersect = encoding.intersection_update
+                for child in getattribute("children"):
+                    intersect( meta_canonicalize_tags(child.encoding) )
+                    if not encoding:
+                        break
+
+            # Canonicalize the intersected encodings.
+            value = meta_canonicalize_tags(encoding)
+
+        # Return the calculated value.
+        return value
+
+    # Returns the intersection of all encodings, ignoring our own.
+    # This method gets overridden if the subclass defines its own "encoding".
+    # Also see the code of __getattribute__().
+    @property
+    def encoding(self):
+        encoding = set()
+        update = encoding.update
+        intersect = encoding.intersection_update
+        for child in self.children:
+            update(child.encoding)
+            if not encoding:
+                break
+            update = intersect
+        return sorted(encoding)
 
     # Containers inherit the stages of its children.
     @property
@@ -1182,24 +1051,43 @@ class Container (Dynamic):
 #-----------------------------------------------------------------------------#
 
 class Concatenator (Container):
-    "Simple concatenation of two or more shellcodes."
+    """
+    Simple concatenation of two or more shellcodes.
+
+    @type arch: str
+    @ivar arch: Processor architecture common to all child shellcodes.
+        If there is no common architecture, the value will be "any".
+
+    @type os: str
+    @ivar os: Operating system common to all child shellcodes.
+        If there is no common OS, the value will be "any".
+
+    @type encoding: tuple(str)
+    @ivar encoding: Intersection of the supported encodings of all its child
+        shellcodes.
+    """
 
     # Don't subclass this class.
     __metaclass__= meta_shellcode_final
+
+    # Disable the metadata dark magic, property methods are faster.
+    __getattribute__ = object.__getattribute__
 
     def __init__(self, *children):
 
         # Populate the list of children.
         super(Concatenator, self).__init__(*children)
 
+    # In-place addition makes sense for concatenators.
     def __iadd__(self, other):
         if isinstance(other, str):    # bytes
             other = Raw(other, self.arch, self.os)
         elif not isinstance(other, Shellcode):
             return NotImplemented
         else:
-            self._check_platform(other)
             if isinstance(other, Concatenator):
+                if self._children and other.children:
+                    self._children[-1]._check_platform(other._children[0])
                 self._children.extend(other.children)
                 parent = weakref.ref(self)
                 for child in other.children:
@@ -1240,40 +1128,17 @@ class Concatenator (Container):
                     break
         return os
 
-    # Returns the union of all requirements.
-    # TODO: revise this concept!
-    @property
-    def requires(self):
-        requires = set()
-        for child in self.children:
-            requires.update(child.requires)
-        return sorted(requires)
-
-    # Returns the union of all provisions.
-    # TODO: revise this concept!
-    @property
-    def provides(self):
-        provides = set()
-        for child in self.children:
-            provides.update(child.provides)
-        return sorted(provides)
-
-    # Returns the union of all qualities.
-    @property
-    def qualities(self):
-        qualities = set()
-        for child in self.children:
-            qualities.update(child.qualities)
-        return sorted(qualities)
-
     # Returns the intersection of all encodings.
     @property
     def encoding(self):
         encoding = set()
         update = encoding.update
+        intersect = encoding.intersection_update
         for child in self.children:
             update(child.encoding)
-            update = encoding.intersection_update
+            if not encoding:
+                break
+            update = intersect
         return sorted(encoding)
 
     # Concatenate all bytes.
@@ -1284,82 +1149,7 @@ class Concatenator (Container):
 #-----------------------------------------------------------------------------#
 
 class Decorator (Container):
-    """
-    Decorators wrap around a shellcode to modify its compilation.
-
-    @note: By default, the metadata of a Decorator instance is combined with
-        that of the Shellcode it wraps. The platform is inherited if in the
-        class it's declared to be C{"any"}, encodings are intersected and other
-        properties are united. For example::
-
-            >>> import shellgen
-            >>> class ExampleShellcode (shellgen.Static):
-            ...     os = "windows"
-            ...     provides = "payload"
-            ...     encoding = "lower, ascii, nullfree"
-            ...
-            >>> class ExampleDecorator (shellgen.Decorator):
-            ...     os = "any"
-            ...     provides = "pc"
-            ...     encoding = "alpha, ascii, nullfree"
-            ...
-            >>> print ExampleDecorator( ExampleShellcode() ).os
-            'windows'
-            >>> print ExampleDecorator( ExampleShellcode() ).provides
-            ('payload', 'syscall')
-            >>> print ExampleDecorator( ExampleShellcode() ).encoding
-            ('ascii', 'nullfree')
-
-        To override this behavior, you can set the metadata in the constructor
-        of your subclass, for example like this::
-
-            class ExampleDecorator (shellgen.Decorator):
-
-                # Class metadata describes the code added
-                # by the decorator itself, independently of its child.
-                arch = "x86"
-                os = "windows"
-                requires = "pc, syscall"
-                qualities = "stack_exec, uses_seh"
-
-                def __init__(self, child):
-                    super(MyDecorator, self).__init__(child)
-
-                    # This forces instances to use the metadata of the class.
-                    self.arch      = MyDecorator.arch
-                    self.os        = MyDecorator.os
-                    self.requires  = MyDecorator.requires
-                    self.provides  = MyDecorator.provides
-                    self.qualities = MyDecorator.qualities
-                    self.encoding  = MyDecorator.encoding
-
-        You can use the same trick to make the Decorator transparently mirror
-        the metadata of the child, like this::
-
-            class ExampleDecorator (shellgen.Decorator):
-                def __init__(self, child):
-                    super(MyDecorator, self).__init__(child)
-
-                    # This forces instances to copy the metadata of the child.
-                    self.arch      = child.arch
-                    self.os        = child.os
-                    self.requires  = child.requires
-                    self.provides  = child.provides
-                    self.qualities = child.qualities
-                    self.encoding  = child.encoding
-
-        Or you can define property methods instead::
-
-            class ExampleDecorator (shellgen.Decorator):
-
-                @property
-                def encoding(self):
-
-                    # For example, we would copy the encoding.
-                    # This would work even if the child changes its encoding
-                    # later on runtime.
-                    return self.child
-    """
+    "Decorators wrap around a shellcode to modify its compilation."
 
     def __init__(self, child):
         """
@@ -1367,61 +1157,6 @@ class Decorator (Container):
         @param child: Shellcode whose compilation will be modified.
         """
         super(Decorator, self).__init__(child)
-
-    # Dark magic to implement the metadata combination feature.
-    def __getattribute__(self, name):
-
-        # Get the super getattribute method.
-        getattribute = super(Decorator, self).__getattribute__
-
-        # Get the dictionary of instance variables.
-        # This excludes the variables defined in the class.
-        instance_vars = object.__getattribute__(self, "__dict__")
-
-        # Try to get the value from the instance.
-        try:
-            value = instance_vars[name]
-
-        # If it's not defined in the instance, do the dark magic...
-        except KeyError:
-
-            # Get the value using the normal lookup.
-            # This includes values defined in the class and decorators.
-            try:
-                value = getattribute(name)
-            except AttributeError:
-                value = None
-
-            # If the value was obtained through a property method,
-            # return it unmodified.
-            try:
-                clazz = getattribute('__class__')
-                if type(getattr(clazz, name)) == property:
-                    return value
-            except AttributeError:
-                pass
-
-            # The platform is inherited from the child only when the class
-            # defines it as "any".
-            if name in ("arch", "os") and value == "any":
-                child = getattribute("child")
-                value = getattr(child, name)
-
-            # The encoding is intersected, the rest of the metadata properties
-            # are united.
-            elif name in ("requires", "provides", "qualities", "encoding"):
-                child = getattribute("child")
-                value = meta_canonicalize_tags(value)
-                child_value = getattr(child, name)
-                child_value = meta_canonicalize_tags(child_value)
-                if name == "encoding":
-                    value = set(value).intersection(child_value)
-                else:
-                    value = value + child_value
-                value = meta_canonicalize_tags(value)
-
-        # Return the calculated value.
-        return value
 
     @property
     def child(self):
@@ -1599,19 +1334,16 @@ if __name__ == '__main__':
 
         # Test the platform metadata.
         class TestArchAny(Static):
-            provides = "multiarch"
             encoding = "unicode, nullfree"
             bytes = "TestArchAny"
         TestArchAny.arch = "any"
         TestArchAny.os = "windows"
         class TestOsAny(Static):
-            provides = "multios"
             encoding = "unicode, nullfree"
             bytes = "TestOsAny"
         TestOsAny.arch = "x86"
         TestOsAny.os = "any"
         class TestArchOsAny(Static):
-            provides = "multiarch, multios"
             encoding = "nullfree"
             bytes = "TestArchOsAny"
         TestArchOsAny.arch = "any"
@@ -1622,13 +1354,12 @@ if __name__ == '__main__':
         TestArchOsSomething.arch = "x86"
         TestArchOsSomething.os = "windows"
         class TestArchIncompatible(Static):
-            provides = "multios"
             encoding = "nullfree"
             bytes = "TestArchIncompatible"
         TestArchIncompatible.arch = "ppc"
         TestArchIncompatible.os = "any"
         class TestOsIncompatible(Static):
-            provides = "multiarch"
+            encoding = "ascii"
             bytes = "TestOsIncompatible"
         TestOsIncompatible.arch = "any"
         TestOsIncompatible.os = "osx"
@@ -1661,9 +1392,9 @@ if __name__ == '__main__':
             TestArchOsSomething() + TestArchOsIncompatible()
             assert w
 
-        # Test concatenation and metadata inheritance.
+        # Test concatenation and encoding inheritance.
         # (This is a lame test, I know. I got lazy, sorry!)
-        from shellgen.base import print_shellcode_tree
+        from shellgen.util import print_shellcode_tree
         ##print_shellcode_tree( test3 ) # For updating the test...
         ##sys.exit(0)                   # For updating the test...
         from StringIO import StringIO
@@ -1677,38 +1408,32 @@ if __name__ == '__main__':
         assert capture.getvalue() == (
 """Concatenator
 * Platform:  any (any)
-* Provides:  multiarch, multios
 * Children:  2
 
     Concatenator
     * Platform:  windows (x86)
-    * Provides:  multiarch, multios
     * Encoding:  nullfree
     * Children:  3
 
         Concatenator
         * Platform:  windows (x86)
-        * Provides:  multiarch, multios
         * Encoding:  nullfree, unicode
         * Children:  2
 
             TestArchAny
             * Platform:  windows (any)
-            * Provides:  multiarch
             * Encoding:  nullfree, unicode
             * Length:    11
             * Bytes:     5465737441726368416e79
 
             TestOsAny
             * Platform:  any (x86)
-            * Provides:  multios
             * Encoding:  nullfree, unicode
             * Length:    9
             * Bytes:     546573744f73416e79
 
         TestArchOsAny
         * Platform:  any (any)
-        * Provides:  multiarch, multios
         * Encoding:  nullfree
         * Length:    13
         * Bytes:     54657374417263684f73416e79
@@ -1721,19 +1446,17 @@ if __name__ == '__main__':
 
     Concatenator
     * Platform:  osx (ppc)
-    * Provides:  multiarch, multios
     * Children:  3
 
         TestArchIncompatible
         * Platform:  any (ppc)
-        * Provides:  multios
         * Encoding:  nullfree
         * Length:    20
         * Bytes:     5465737441726368...6d70617469626c65
 
         TestOsIncompatible
         * Platform:  osx (any)
-        * Provides:  multiarch
+        * Encoding:  ascii
         * Length:    18
         * Bytes:     546573744f73496e...6d70617469626c65
 
@@ -1767,14 +1490,12 @@ if __name__ == '__main__':
         assert capture.getvalue() == (
 """Concatenator
 * Platform:  any (any)
-* Provides:  multiarch, multios
 * Children:  2
 * Length:    112
 * Bytes:     5465737441726368...6d70617469626c65
 
     Concatenator
     * Platform:  windows (x86)
-    * Provides:  multiarch, multios
     * Encoding:  nullfree
     * Children:  3
     * Length:    52
@@ -1782,7 +1503,6 @@ if __name__ == '__main__':
 
         Concatenator
         * Platform:  windows (x86)
-        * Provides:  multiarch, multios
         * Encoding:  nullfree, unicode
         * Children:  2
         * Length:    20
@@ -1790,21 +1510,18 @@ if __name__ == '__main__':
 
             TestArchAny
             * Platform:  windows (any)
-            * Provides:  multiarch
             * Encoding:  nullfree, unicode
             * Length:    11
             * Bytes:     5465737441726368416e79
 
             TestOsAny
             * Platform:  any (x86)
-            * Provides:  multios
             * Encoding:  nullfree, unicode
             * Length:    9
             * Bytes:     546573744f73416e79
 
         TestArchOsAny
         * Platform:  any (any)
-        * Provides:  multiarch, multios
         * Encoding:  nullfree
         * Length:    13
         * Bytes:     54657374417263684f73416e79
@@ -1817,21 +1534,19 @@ if __name__ == '__main__':
 
     Concatenator
     * Platform:  osx (ppc)
-    * Provides:  multiarch, multios
     * Children:  3
     * Length:    60
     * Bytes:     5465737441726368...6d70617469626c65
 
         TestArchIncompatible
         * Platform:  any (ppc)
-        * Provides:  multios
         * Encoding:  nullfree
         * Length:    20
         * Bytes:     5465737441726368...6d70617469626c65
 
         TestOsIncompatible
         * Platform:  osx (any)
-        * Provides:  multiarch
+        * Encoding:  ascii
         * Length:    18
         * Bytes:     546573744f73496e...6d70617469626c65
 
@@ -1847,7 +1562,8 @@ if __name__ == '__main__':
         import random
         class TestBytecodeCache(Dynamic):
             def compile(self, state):
-                return random_chars( random.randint(1, 16) )
+                return "".join((chr(random.randint(0, 256))
+                                for x in xrange(random.randint(1, 16)) ))
         test_rnd = TestBytecodeCache()
         assert test_rnd.bytes == test_rnd.bytes
         tmp = test_rnd.bytes
@@ -1870,145 +1586,5 @@ if __name__ == '__main__':
         assert tmp1 != test_rnd1.bytes
         assert tmp2 != test_rnd2.bytes
         assert tmp3 != test_rnd3.bytes
-
-        # Test loading shellcode modules dynamically.
-        MyNop = get_shellcode_class("x86", "any", "nop", "Nop")
-        from shellgen.x86.nop import Nop
-        assert MyNop is Nop
-        assert Nop.arch == "x86"
-        assert Nop.os == "any"
-        MyPadder = get_shellcode_class("x86_64", None, "nop", "Padder")
-        from shellgen.x86_64.nop import Padder
-        assert MyPadder is Padder
-        assert Padder.arch == "x86_64"
-        assert Padder.os == "any"
-        MyExecute = get_shellcode_class("mips", "irix", "execute", "Execute")
-        from shellgen.mips.irix.execute import Execute
-        assert MyExecute is Execute
-        assert Execute.arch == "mips"
-        assert Execute.os == "irix"
-        try:
-            get_shellcode_class("fake", "fake", "fake", "Fake")
-            assert False
-        except NotImplementedError:
-            pass
-        except Exception:
-            assert False
-        try:
-            get_shellcode_class(".fake", "fake", "fake", "Fake")
-            assert False
-        except ValueError:
-            pass
-        except Exception:
-            assert False
-        try:
-            get_shellcode_class("fake", "/fake", "fake", "Fake")
-            assert False
-        except ValueError:
-            pass
-        except Exception:
-            assert False
-        try:
-            get_shellcode_class("fake", "fake", ".fake", "Fake")
-            assert False
-        except ValueError:
-            pass
-        except Exception:
-            assert False
-        try:
-            get_shellcode_class("fake", "fake", "fake", "Fa.ke")
-            assert False
-        except ValueError:
-            pass
-        except Exception:
-            assert False
-        try:
-            get_shellcode_class("\\fake", "fake", "fake", "Fake")
-            assert False
-        except ValueError:
-            pass
-        except Exception:
-            assert False
-        try:
-            get_shellcode_class("fake", "*fake", "fake", "Fake")
-            assert False
-        except ValueError:
-            pass
-        except Exception:
-            assert False
-        try:
-            get_shellcode_class("fake", "fake", "fake", "_Fake")
-            assert False
-        except ValueError:
-            pass
-        except Exception:
-            assert False
-
-        # Test listing the available platforms.
-        platforms = get_available_platforms()
-        ##print platforms
-        assert platforms
-        assert len(set(platforms)) == len(platforms)
-        assert sorted(platforms) == platforms
-        assert all((len(x) == 2 for x in platforms))
-        assert all((x[0].lower().strip() == x[0] and x[1].lower().strip() == x[1] \
-                    for x in platforms))
-
-        # Test character generation.
-        assert len(set(default_bad_chars)) == len(default_bad_chars)
-        assert len(set(good_chars())) == len(good_chars())
-        assert len(default_bad_chars) + len(good_chars()) == 256
-        assert set(good_chars()).isdisjoint(set(default_bad_chars))
-        assert set(random_chars(100)).isdisjoint(set(default_bad_chars))
-
-        # Test encoding autodetection.
-        try:
-            autodetect_encoding(1)
-            assert False
-        except TypeError:
-            pass
-        try:
-            Raw(1)
-            assert False
-        except TypeError:
-            pass
-        empty_str_encoding = autodetect_encoding("")
-        assert empty_str_encoding == autodetect_encoding(None)
-        assert empty_str_encoding == Raw("").encoding
-        assert empty_str_encoding == Raw(Raw("")).encoding
-        assert empty_str_encoding == autodetect_encoding(Raw(""))
-        assert "nullfree" in autodetect_encoding(random_chars(100))
-        assert "nullfree" in Raw(random_chars(100)).encoding
-        encoding_test_data = {
-            "": ('alpha', 'ascii', 'lower', 'nullfree', 'unicode', 'upper'),
-            "\x00": ('alpha', 'ascii', 'lower', 'term_null', 'upper'),
-            "\x00\x00": ('alpha', 'ascii', 'lower', 'unicode', 'upper'),
-            "hola manola\x00": ('ascii', 'lower', 'term_null'),
-            "HOLA MANOLA\x00": ('ascii', 'term_null', 'upper'),
-            "Hola Manola": ('ascii', 'nullfree'),
-            "matanga\x00": ('alpha', 'ascii', 'lower', 'term_null'),
-            "MATANGA\x00": ('alpha', 'ascii', 'term_null', 'upper'),
-            "Matanga": ('alpha', 'ascii', 'nullfree'),
-            "h\0o\0l\0a\0 \0m\0a\0n\0o\0l\0a\0": ('ascii', 'lower', 'unicode'),
-            "h\0o\0l\0a\0 \0m\0a\0n\0o\0l\0a\0\0": ('ascii', 'lower'),              # unaligned size
-            "\0h\0o\0l\0a\0 \0m\0a\0n\0o\0l\0a\0\0": ('ascii', 'lower'),            # unaligned address
-            "h\0o\0l\0a\0 \0m\0a\0n\0o\0l\0a\0\0\0": ('ascii', 'lower', 'term_null', 'unicode'),
-            "M\0A\0T\0A\0N\0G\0A\0": ('alpha', 'ascii', 'unicode', 'upper'),
-            "M\0A\0T\0A\0N\0G\0A\0\0": ('alpha', 'ascii', 'upper'),                 # unaligned size
-            "\0M\0A\0T\0A\0N\0G\0A\0": ('alpha', 'ascii', 'upper'),                 # unaligned address
-            "M\0A\0T\0A\0N\0G\0A\0\0\0": ('alpha', 'ascii', 'term_null', 'unicode', 'upper'),
-            "Matanga!": ('ascii', 'nullfree'),
-            chr(128): ('lower', 'nullfree', 'upper'),
-            (chr(128) + chr(0)): ('lower', 'term_null', 'unicode', 'upper'),
-            (chr(128) + chr(128) + chr(0)): ('lower', 'term_null', 'upper'),
-            (chr(128) + chr(0) + chr(128)): ('lower', 'upper'),
-            default_bad_chars: ('ascii', 'lower', 'upper'),
-            good_chars(): ('nullfree',),
-        }
-        for test_str, test_result in encoding_test_data.iteritems():
-            if autodetect_encoding(test_str) != test_result:
-                raise AssertionError("autodetect_encoding() test failed: %r" % test_str)
-            if Raw(test_str).encoding != test_result:
-                raise AssertionError("Raw() test failed: %r" % test_str)
 
     test()
