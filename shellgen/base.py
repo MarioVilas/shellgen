@@ -1078,28 +1078,6 @@ class Concatenator (Container):
         # Populate the list of children.
         super(Concatenator, self).__init__(*children)
 
-    # In-place addition makes sense for concatenators.
-    def __iadd__(self, other):
-        if isinstance(other, str):    # bytes
-            other = Raw(other, self.arch, self.os)
-        elif not isinstance(other, Shellcode):
-            return NotImplemented
-        else:
-            if isinstance(other, Concatenator):
-                if self._children and other.children:
-                    self._children[-1]._check_platform(other._children[0])
-                self._children.extend(other.children)
-                parent = weakref.ref(self)
-                for child in other.children:
-                    oldparent = child.parent
-                    if oldparent and oldparent != other:
-                        msg = "Already had a parent: %r" % oldparent
-                        warnings.warn(msg, ShellcodeWarning)
-                    child._parent = parent
-                return self
-        self._children.append(other)
-        return self
-
     # If all children are compatible with the same architecture, return it.
     # Otherwise return "any".
     @property
@@ -1405,7 +1383,7 @@ if __name__ == '__main__':
             print_shellcode_tree( test3 )
         finally:
             sys.stdout = stdout
-        assert capture.getvalue() == (
+        expected = (
 """Concatenator
 * Platform:  any (any)
 * Children:  2
@@ -1413,30 +1391,35 @@ if __name__ == '__main__':
     Concatenator
     * Platform:  windows (x86)
     * Encoding:  nullfree
-    * Children:  3
+    * Children:  2
 
         Concatenator
         * Platform:  windows (x86)
-        * Encoding:  nullfree, unicode
+        * Encoding:  nullfree
         * Children:  2
 
-            TestArchAny
-            * Platform:  windows (any)
+            Concatenator
+            * Platform:  windows (x86)
             * Encoding:  nullfree, unicode
-            * Length:    11
-            * Bytes:     5465737441726368416e79
+            * Children:  2
 
-            TestOsAny
-            * Platform:  any (x86)
-            * Encoding:  nullfree, unicode
-            * Length:    9
-            * Bytes:     546573744f73416e79
+                TestArchAny
+                * Platform:  windows (any)
+                * Encoding:  nullfree, unicode
+                * Length:    11
+                * Bytes:     5465737441726368416e79
 
-        TestArchOsAny
-        * Platform:  any (any)
-        * Encoding:  nullfree
-        * Length:    13
-        * Bytes:     54657374417263684f73416e79
+                TestOsAny
+                * Platform:  any (x86)
+                * Encoding:  nullfree, unicode
+                * Length:    9
+                * Bytes:     546573744f73416e79
+
+            TestArchOsAny
+            * Platform:  any (any)
+            * Encoding:  nullfree
+            * Length:    13
+            * Bytes:     54657374417263684f73416e79
 
         TestArchOsSomething
         * Platform:  windows (x86)
@@ -1446,19 +1429,23 @@ if __name__ == '__main__':
 
     Concatenator
     * Platform:  osx (ppc)
-    * Children:  3
+    * Children:  2
 
-        TestArchIncompatible
-        * Platform:  any (ppc)
-        * Encoding:  nullfree
-        * Length:    20
-        * Bytes:     5465737441726368...6d70617469626c65
+        Concatenator
+        * Platform:  osx (ppc)
+        * Children:  2
 
-        TestOsIncompatible
-        * Platform:  osx (any)
-        * Encoding:  ascii
-        * Length:    18
-        * Bytes:     546573744f73496e...6d70617469626c65
+            TestArchIncompatible
+            * Platform:  any (ppc)
+            * Encoding:  nullfree
+            * Length:    20
+            * Bytes:     5465737441726368...6d70617469626c65
+
+            TestOsIncompatible
+            * Platform:  osx (any)
+            * Encoding:  ascii
+            * Length:    18
+            * Bytes:     546573744f73496e...6d70617469626c65
 
         TestArchOsIncompatible
         * Platform:  osx (ppc)
@@ -1467,6 +1454,9 @@ if __name__ == '__main__':
         * Bytes:     5465737441726368...6d70617469626c65
 
 """)
+        ##open("1.txt","wb").write(capture.getvalue())  # for manually checking
+        ##open("2.txt","wb").write(expected)            # the differences
+        assert capture.getvalue() == expected
         test3.compile()
         assert test3.bytes == (
             "TestArchAny"
@@ -1487,7 +1477,7 @@ if __name__ == '__main__':
             print_shellcode_tree( test3 )
         finally:
             sys.stdout = stdout
-        assert capture.getvalue() == (
+        expected = (
 """Concatenator
 * Platform:  any (any)
 * Children:  2
@@ -1497,34 +1487,41 @@ if __name__ == '__main__':
     Concatenator
     * Platform:  windows (x86)
     * Encoding:  nullfree
-    * Children:  3
+    * Children:  2
     * Length:    52
     * Bytes:     5465737441726368...6f6d657468696e67
 
         Concatenator
         * Platform:  windows (x86)
-        * Encoding:  nullfree, unicode
-        * Children:  2
-        * Length:    20
-        * Bytes:     5465737441726368...6573744f73416e79
-
-            TestArchAny
-            * Platform:  windows (any)
-            * Encoding:  nullfree, unicode
-            * Length:    11
-            * Bytes:     5465737441726368416e79
-
-            TestOsAny
-            * Platform:  any (x86)
-            * Encoding:  nullfree, unicode
-            * Length:    9
-            * Bytes:     546573744f73416e79
-
-        TestArchOsAny
-        * Platform:  any (any)
         * Encoding:  nullfree
-        * Length:    13
-        * Bytes:     54657374417263684f73416e79
+        * Children:  2
+        * Length:    33
+        * Bytes:     5465737441726368...7263684f73416e79
+
+            Concatenator
+            * Platform:  windows (x86)
+            * Encoding:  nullfree, unicode
+            * Children:  2
+            * Length:    20
+            * Bytes:     5465737441726368...6573744f73416e79
+
+                TestArchAny
+                * Platform:  windows (any)
+                * Encoding:  nullfree, unicode
+                * Length:    11
+                * Bytes:     5465737441726368416e79
+
+                TestOsAny
+                * Platform:  any (x86)
+                * Encoding:  nullfree, unicode
+                * Length:    9
+                * Bytes:     546573744f73416e79
+
+            TestArchOsAny
+            * Platform:  any (any)
+            * Encoding:  nullfree
+            * Length:    13
+            * Bytes:     54657374417263684f73416e79
 
         TestArchOsSomething
         * Platform:  windows (x86)
@@ -1534,21 +1531,27 @@ if __name__ == '__main__':
 
     Concatenator
     * Platform:  osx (ppc)
-    * Children:  3
+    * Children:  2
     * Length:    60
     * Bytes:     5465737441726368...6d70617469626c65
 
-        TestArchIncompatible
-        * Platform:  any (ppc)
-        * Encoding:  nullfree
-        * Length:    20
+        Concatenator
+        * Platform:  osx (ppc)
+        * Children:  2
+        * Length:    38
         * Bytes:     5465737441726368...6d70617469626c65
 
-        TestOsIncompatible
-        * Platform:  osx (any)
-        * Encoding:  ascii
-        * Length:    18
-        * Bytes:     546573744f73496e...6d70617469626c65
+            TestArchIncompatible
+            * Platform:  any (ppc)
+            * Encoding:  nullfree
+            * Length:    20
+            * Bytes:     5465737441726368...6d70617469626c65
+
+            TestOsIncompatible
+            * Platform:  osx (any)
+            * Encoding:  ascii
+            * Length:    18
+            * Bytes:     546573744f73496e...6d70617469626c65
 
         TestArchOsIncompatible
         * Platform:  osx (ppc)
@@ -1557,6 +1560,28 @@ if __name__ == '__main__':
         * Bytes:     5465737441726368...6d70617469626c65
 
 """)
+        ##open("1.txt","wb").write(capture.getvalue())  # for manually checking
+        ##open("2.txt","wb").write(expected)            # the differences
+        assert capture.getvalue() == expected
+
+        # Test warnings when concatenating more than once.
+        test1 = TestArchOsAny()
+        test2 = TestArchOsAny()
+        test3 = test1 + test2
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            test4 = test1 + test2
+            assert w        # fails because test3 was the parent
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            test3 += test2
+            assert w        # fails because test4 was the parent
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            del test3
+            test4 = TestArchOsAny() + TestArchOsAny()
+            test4 += test2
+            assert not w    # now works because we deleted the parent
 
         # Test the dynamic shellcode's cache.
         import random

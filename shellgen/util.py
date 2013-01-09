@@ -31,7 +31,7 @@ Utility functions for ShellGen.
 __all__ = [
     "get_shellcode_class", "get_available_platforms", "autodetect_encoding",
     "find_bad_chars", "default_bad_chars", "good_chars", "random_chars",
-    "is_stack_balanced",
+    "is_stack_balanced", "uses_stack", "uses_heap", "uses_seh",
     "print_shellcode_tree",
 ]
 
