@@ -868,7 +868,7 @@ class Container (Dynamic):
             ...     encoding = ('ascii', 'nullfree')
             ...
             >>> print ExampleContainer( ExampleShellcode() ).encoding
-            ('nullfree')
+            ('nullfree',)
 
         If the Container class doesn't declare any encoding, then only the
         children's encodings are intersected::
@@ -992,7 +992,7 @@ class Container (Dynamic):
             if not encoding:
                 break
             update = intersect
-        return sorted(encoding)
+        return meta_canonicalize_tags(encoding)
 
     # Containers inherit the stages of its children.
     @property
@@ -1310,6 +1310,24 @@ if __name__ == '__main__':
         assert t.encoding == ("co", "di", "ding", "en", "enco", "g", "n")
         assert t.encoding != TestCanonicalization.encoding
 
+        # Test encoding inheritance for Container shellcodes.
+        class ExampleShellcode (Static):
+            encoding = ('unicode', 'nullfree')
+        class ExampleContainer (Container):
+            encoding = ('ascii', 'nullfree')
+        assert ExampleContainer( ExampleShellcode() ).encoding == ('nullfree',)
+        class ExampleContainer (Container):
+            pass
+        assert ExampleContainer( ExampleShellcode() ).encoding == \
+                                     ExampleShellcode.encoding
+        class ExampleContainer (Container):
+            encoding = ('ascii', 'nullfree')
+            def __init__(self, *children):
+                super(ExampleContainer, self).__init__(*children)
+                self.encoding = ExampleContainer.encoding
+        assert ExampleContainer( ExampleShellcode() ).encoding == \
+                                     ExampleContainer.encoding
+
         # Test the platform metadata.
         class TestArchAny(Static):
             encoding = "unicode, nullfree"
@@ -1587,7 +1605,7 @@ if __name__ == '__main__':
         import random
         class TestBytecodeCache(Dynamic):
             def compile(self, state):
-                return "".join((chr(random.randint(0, 256))
+                return "".join((chr(random.randint(0, 255))
                                 for x in xrange(random.randint(1, 16)) ))
         test_rnd = TestBytecodeCache()
         assert test_rnd.bytes == test_rnd.bytes
