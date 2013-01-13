@@ -83,6 +83,10 @@ def get_shellcode_class(arch, os, module, classname):
     # Canonicalize the arch and os.
     arch, os = meta_canonicalize_platform(arch, os)
 
+    # Abstract shellcodes can't be instanced.
+    if arch == "all":
+        raise ValueError("Abstract shellcodes can't be instanced")
+
     # Validate the module and classname.
     if not is_valid_module_path_component(module):
         raise ValueError("Bad shellcode module: %r" % module)
@@ -137,6 +141,10 @@ def get_available_platforms():
 
         # Skip hidden files, "." and "..", and private modules.
         if arch_name.startswith(".") or arch_name.startswith("_"):
+            continue
+
+        # Skip the "abstract" directory.
+        if arch_name == "abstract":
             continue
 
         # Skip non-directories and directories without "__init__.py" inside.
@@ -194,6 +202,7 @@ def get_available_modules(arch, os):
 
     @rtype:  list(str)
     @return: List of shellcode module names.
+    @raise ValueError: Invalid arguments.
     """
 
     # Canonicalize the arch and os.
@@ -204,6 +213,16 @@ def get_available_modules(arch, os):
         platform_path = path.join(base_dir, arch)
     else:
         platform_path = path.join(base_dir, arch, os)
+
+    # If the directory doesn't exist, raise an exception.
+    if not path.isdir(platform_path):
+        if os == "any":
+            msg = "No built-in shellcodes available for the %r architecture."
+            msg = msg % arch
+        else:
+            msg = "No built-in shellcodes available for the %s-%s platform."
+            msg = msg % (os, arch)
+        raise ValueError(msg)
 
     # Build the list of modules.
     module_list = [ x[:-3] for x in listdir(platform_path)
@@ -246,11 +265,9 @@ def get_available_classes(arch, os, module):
     # Canonicalize the arch and os.
     arch, os = meta_canonicalize_platform(arch, os)
 
-    # Validate the module and classname.
+    # Validate the module.
     if not is_valid_module_path_component(module):
         raise ValueError("Bad shellcode module: %r" % module)
-    if not is_valid_module_path_component(classname):
-        raise ValueError("Bad shellcode class: %r" % classname)
 
     # Build the fully qualified module name.
     if os == "any":
@@ -265,10 +282,12 @@ def get_available_classes(arch, os, module):
         msg = "Error loading module %s: %s" % (path, str(e))
         raise NotImplementedError(msg)
 
-    # Return the classes that derive from Shellcode.
+    # Return the classes that derive from Shellcode defined in this module.
     class_list = [getattr(modobj, name) for name in dir(modobj)]
     class_list = [clazz for clazz in class_list
-                        if issubclass(clazz, Shellcode)]
+                        if isinstance(clazz, type)      and
+                           clazz.__module__ == path     and
+                           issubclass(clazz, Shellcode) ]
     return class_list
 
 #-----------------------------------------------------------------------------#
@@ -582,6 +601,22 @@ def test():
         pass
     except Exception:
         assert False
+    platforms = get_available_platforms()
+    assert not any(("abstract" in x for x in platforms))
+    for arch, os in platforms:
+        modules = get_available_modules(arch, os)
+##        assert modules        # uncomment when version 0.1 is released!
+        for module in modules:
+            if os == "any":
+                mod_path = "shellgen.%s.%s" % (arch, module)
+            else:
+                mod_path = "shellgen.%s.%s.%s" % (arch, os, module)
+            classes = get_available_classes(arch, os, module)
+            assert classes
+            for cls in classes:
+                assert cls.__module__ == mod_path
+                assert cls.arch == arch or isinstance(cls.arch, property)
+                assert   cls.os == os   or isinstance(cls.os, property)
 
     # Test listing the available platforms.
     platforms = get_available_platforms()

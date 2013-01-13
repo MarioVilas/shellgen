@@ -22,73 +22,15 @@
 # MA 02110-1301, USA.
 
 from __future__ import absolute_import
-from ..base import Dynamic, Decorator
+from ..abstract.nop import AbstractNop, AbstractPadder
 
 __all__ = ["Nop", "Padder"]
 
-#-----------------------------------------------------------------------------#
+class Nop (AbstractNop):
+    nop = "\x00\x00\x00\x00"        # 00 00 00 00   sll r0, r0, 0
 
-class Nop (Dynamic):
-    qualities = "no_stack, stack_balanced, preserve_registers"
-
-    def __init__(self, size = 4):
-        if size & 3 != 0:
-            raise ValueError("MIPS instructions are always 4 bytes in size")
-        self.size = size
-
-    def compile(self, *argv, **argd):
-        if self.size & 3 != 0:
-            raise ValueError("MIPS instructions are always 4 bytes in size")
-        return "\x00" * self.size   # 00 00 00 00   sll r0, r0, 0
-
-#-----------------------------------------------------------------------------#
-
-class Padder (Decorator):
-
-    def __init__(self, child, size):
-        super(Padder, self).__init__(child)
-        if abs(size) & 3 != 0:
-            raise ValueError("MIPS instructions are always 4 bytes in size")
-        self.size = size
-
-    def compile(self, state):
-
-        # Get the total size we want to reach.
-        size  = self.size
-        total = abs(size)
-        if total & 3 != 0:
-            raise ValueError("MIPS instructions are always 4 bytes in size")
-
-        # Compile the child shellcode.
-        self.child.compile(state)
-        bytes = self.child.bytes
-
-        # If the child shellcode is too big, fail.
-        if total < len(bytes):
-            raise RuntimeError(
-                "Child shellcode exceeds maximum size of %d" % total)
-
-        # Make a NOP sled.
-        nopsled = Nop( total - len(bytes) )
-        if size > 0:    # not in order anymore
-            state.next_piece()
-        nopsled.compile(state)
-        pad = nopsled.bytes
-
-        # If the pad goes before the bytes, relocate the child.
-        if size > 0:
-            self.child.relocate(len(pad))
-            bytes = self.child.bytes
-
-        # If the "size" is a positive number, put the padding before the bytes.
-        # If it's a negative number, put the padding after the bytes.
-        if size < 0:
-            bytes = bytes + pad
-        else:
-            bytes = pad + bytes
-
-        # Return the bytecode.
-        return bytes
+class Padder (AbstractPadder):
+    Nop = Nop
 
 #-----------------------------------------------------------------------------#
 

@@ -72,12 +72,24 @@ except Exception:
 
 # The test suite.
 class TestCommand(Command):
+
     user_options = []
+
     def initialize_options(self):
         pass
+
     def finalize_options(self):
         pass
+
     def run(self):
+        try:
+            self.__test()
+        except Exception:
+            import traceback
+            traceback.print_exc()
+            raise
+
+    def __test(self):
         import sys
         sys.path.insert(0, dirname(__file__))
         print "testing shellgen.base"
@@ -91,22 +103,28 @@ class TestCommand(Command):
         test()
         from shellgen.util import get_available_platforms, \
                                   get_available_modules
+        for module in get_available_modules("abstract", "any"):
+            self.__test_module("abstract", "any", module)
         for arch, os in get_available_platforms():
             for module in get_available_modules(arch, os):
-                if os == "any":
-                    module_path = "shellgen.%s.%s" % (arch, module)
-                else:
-                    module_path = "shellgen.%s.%s.%s" % (arch, os, module)
-                try:
-                    modobj = __import__(module_path, fromlist = ["test"])
-                    test   = getattr(modobj, "test")
-                except ImportError:
-                    continue
-                except AttributeError:
-                    continue
-                print "testing " + module_path
-                test()
+                self.__test_module(arch, os, module)
 
+    def __test_module(self, arch, os, module):
+        if os == "any":
+            module_path = "shellgen.%s.%s" % (arch, module)
+        else:
+            module_path = "shellgen.%s.%s.%s" % (arch, os, module)
+        try:
+            modobj = __import__(module_path, fromlist = ["test"])
+            test   = getattr(modobj, "test")
+        except ImportError:
+            return
+        except AttributeError:
+            return
+        print "testing " + module_path
+        test()
+
+# Add the 'test' command.
 metadata['cmdclass'] = {'test': TestCommand}
 
 # Execute the setup script.
