@@ -21,16 +21,12 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA 02110-1301, USA.
 
-__all__ = ["SubSP", "AllocaProbe"]
+from __future__ import absolute_import
+from ..base import Dynamic
 
 import struct
 
-# For unit testing always load this version, not the one installed.
-if __name__ == '__main__':
-    import sys, os.path
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-
-from shellgen import Dynamic
+__all__ = ["SubSP", "AllocaProbe"]
 
 # Compatibility with Python 2.6 and earlier.
 if hasattr(int, "bit_length"):
@@ -41,7 +37,7 @@ else:
     def bit_length(num):
         return int(math.log(num, 2)) + 1
 
-#------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------#
 
 # Stack pointer adjustment.
 class SubSP (Dynamic):
@@ -153,7 +149,7 @@ class SubSP (Dynamic):
 
         return bytes
 
-#------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------#
 
 # Allocation probe.
 class AllocaProbe (Dynamic):
@@ -302,16 +298,17 @@ class AllocaProbe (Dynamic):
 
         return bytes
 
-#------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------#
 
-# Unit test.
-if __name__ == '__main__':
-    import traceback
+def test():
+    "Unit test."
+
+    #import traceback
 
     from shellgen import CompilerState
 
     def test_ok(clazz, size, nullfree = True):
-        try:
+        #try:
             shellcode = clazz(size)
             if nullfree:
                 state = CompilerState()
@@ -319,15 +316,16 @@ if __name__ == '__main__':
                 shellcode.compile(state)
             is_nullfree = "\x00" not in shellcode.bytes
             claims_nullfree = "nullfree" in shellcode.encoding
-            if is_nullfree != claims_nullfree:
-                msg = "%s null check failed, size %.16X"
-                print msg % (clazz.__name__, size)
-                open("%s_%.16X.bin" % (clazz.__name__, size), "wb").write(bytes)
-        except Exception:
-            msg = "%s failed with exception, size %.16X"
-            print msg % (clazz.__name__, size)
-            print traceback.format_exc()
-            open("%s_%.16X.bin" % (clazz.__name__, size), "wb").write(bytes)
+            assert is_nullfree == claims_nullfree
+        #    if is_nullfree != claims_nullfree:
+        #        msg = "%s null check failed, size %.16X"
+        #        print msg % (clazz.__name__, size)
+        #        open("%s_%.16X.bin" % (clazz.__name__, size), "wb").write(bytes)
+        #except Exception:
+        #    msg = "%s failed with exception, size %.16X"
+        #    print msg % (clazz.__name__, size)
+        #    print traceback.format_exc()
+        #    open("%s_%.16X.bin" % (clazz.__name__, size), "wb").write(bytes)
 
     def test_fail(clazz, size, nullfree = True):
         try:
@@ -337,9 +335,10 @@ if __name__ == '__main__':
                 state.shared["encoding"] = "nullfree"
                 shellcode.compile(state)
             bytes = shellcode.bytes
-            msg = "%s failed to raise exception, size %.16X"
-            print msg % (clazz.__name__, size)
-            open("%s_%.16X.bin" % (clazz.__name__, size), "wb").write(bytes)
+            assert False
+            #msg = "%s failed to raise exception, size %.16X"
+            #print msg % (clazz.__name__, size)
+            #open("%s_%.16X.bin" % (clazz.__name__, size), "wb").write(bytes)
         except Exception:
             pass
 

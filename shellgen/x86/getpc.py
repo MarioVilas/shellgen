@@ -21,17 +21,15 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA 02110-1301, USA.
 
-__all__ = ["GetPC", "GetPC_Alt", "GetPC_FPU", "GetPC_Wrapper"]
+from __future__ import absolute_import
+from ..base import Dynamic, Decorator
+from ..util import is_stack_balanced
 
 from struct import pack
 
-# For unit testing always load this version, not the one installed.
-if __name__ == '__main__':
-    import sys, os.path
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+__all__ = ["GetPC", "GetPC_Alt", "GetPC_FPU", "GetPC_Wrapper"]
 
-from shellgen import Dynamic, Decorator
-from shellgen.util import is_stack_balanced
+#-----------------------------------------------------------------------------#
 
 # Classic GetPC implementation using a jump and a call.
 class GetPC (Dynamic):
@@ -91,7 +89,7 @@ class GetPC (Dynamic):
         # Return the bytecode.
         return bytes
 
-##############################################################################
+#-----------------------------------------------------------------------------#
 
 # Alternative GetPC implementation using a call instruction jumping on itself.
 # As far as I know the first to implement this was Gerardo Richarte:
@@ -163,7 +161,7 @@ class GetPC_Alt (Dynamic):
         # Return the bytecode.
         return bytes
 
-##############################################################################
+#-----------------------------------------------------------------------------#
 
 # Another alternative GetPC implementation using the FPU state.
 # As far as I know the first to come up with this idea was noir:
@@ -226,7 +224,7 @@ class GetPC_FPU (Dynamic):
         # Return the bytecode.
         return bytes
 
-##############################################################################
+#-----------------------------------------------------------------------------#
 
 # This one wraps shellcodes by providing them the address of their payload.
 # The child shellcode MUST be stack balanced.
@@ -276,7 +274,7 @@ class GetPC_Wrapper (Decorator):
 
         # Get the child bytecode.
         state.current["pc"] = pcreg
-        bytes = self.compile_children(state)
+        bytes = self.child.compile(state)
 
         # Check the decoder stub doesn't exceed the maximum size.
         if len(bytes) > 128:
@@ -302,6 +300,8 @@ class GetPC_Wrapper (Decorator):
         call_b = "\xE8" + pack("<l", -8 - len(bytes))
 
         # Build the shellcode.
+        self.child.relocate(len(jmp_f + pop_pc + push_pc))
+        bytes = self.child.bytes
         bytes = jmp_f + pop_pc + push_pc + bytes + ret + call_b
 
         # Check the bytecode for nulls.
@@ -313,8 +313,8 @@ class GetPC_Wrapper (Decorator):
 
 #-----------------------------------------------------------------------------#
 
-# Unit test.
-if __name__ == '__main__':
+def test():
+    "Unit test."
 
     # This is for manual testing.
 ##    open("GetPC.bin","wb").write(GetPC().bytes)
@@ -325,14 +325,13 @@ if __name__ == '__main__':
 
     from shellgen import Raw, CompilerState
 
-    def test(clazz):
+    def test_gpc(clazz):
         shellcode = clazz()
         assert shellcode.length == len(shellcode.bytes)
         assert "\x00" not in shellcode.bytes
-
-    test(GetPC)
-    test(GetPC_Alt)
-    test(GetPC_FPU)
+    test_gpc(GetPC)
+    test_gpc(GetPC_Alt)
+    test_gpc(GetPC_FPU)
 
     assert GetPC.length == GetPC_Alt.length == GetPC_FPU.length
 

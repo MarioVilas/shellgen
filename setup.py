@@ -23,7 +23,7 @@
 
 __all__ = ['metadata', 'setup']
 
-from distutils.core import setup
+from distutils.core import setup, Command
 from warnings import warn
 from os.path import dirname, curdir, join
 
@@ -50,7 +50,6 @@ metadata = {
                         'Natural Language :: English',
                         'Operating System :: OS Independent',
                         'Programming Language :: Assembly',
-                        'Programming Language :: Python :: 2.4',
                         'Programming Language :: Python :: 2.5',
                         'Programming Language :: Python :: 2.6',
                         'Programming Language :: Python :: 2.7',
@@ -70,6 +69,45 @@ try:
     metadata['long_description'] = long_description
 except Exception:
     warn("README file not found or unreadable!")
+
+# The test suite.
+class TestCommand(Command):
+    user_options = []
+    def initialize_options(self):
+        pass
+    def finalize_options(self):
+        pass
+    def run(self):
+        import sys
+        sys.path.insert(0, dirname(__file__))
+        print "testing shellgen.base"
+        from shellgen.base import test
+        test()
+        print "testing shellgen.util"
+        from shellgen.util import test
+        test()
+        print "testing shellgen.payload"
+        from shellgen.payload import test
+        test()
+        from shellgen.util import get_available_platforms, \
+                                  get_available_modules
+        for arch, os in get_available_platforms():
+            for module in get_available_modules(arch, os):
+                if os == "any":
+                    module_path = "shellgen.%s.%s" % (arch, module)
+                else:
+                    module_path = "shellgen.%s.%s.%s" % (arch, os, module)
+                try:
+                    modobj = __import__(module_path, fromlist = ["test"])
+                    test   = getattr(modobj, "test")
+                except ImportError:
+                    continue
+                except AttributeError:
+                    continue
+                print "testing " + module_path
+                test()
+
+metadata['cmdclass'] = {'test': TestCommand}
 
 # Execute the setup script.
 if __name__ == '__main__':

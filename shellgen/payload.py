@@ -21,6 +21,19 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA 02110-1301, USA.
 
+"""
+Prepackaged payloads for ShellGen.
+
+@group Actions:
+    shell, download_exec, execute, adduser, chmod
+
+@group Encoders:
+    xor_encode, ascii_encode, alpha_encode, unicode_encode
+"""
+
+from __future__ import absolute_import
+from .base import *
+
 __all__ = [
 
     # Actions.
@@ -38,18 +51,6 @@ __all__ = [
 
     # Stagers.
 ]
-
-# For unit testing always load this version, not the one installed.
-if __name__ == '__main__':
-    import sys, os.path
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-
-    # Now do an absolute import.
-    from shellgen.base import *
-
-# Otherwise do a relative import.
-else:
-    from base import *
 
 # NOTE: all methods here must invoke the compile() method before returning the
 # shellcode object, so if there are any errors they show up immediately.
@@ -381,11 +382,8 @@ def unicode_encode(payload, allow_upper = True,
 ###############################################################################
 ## Unit test.
 
-if __name__ == '__main__':
-    from shellgen import *
-    def test():
+def test():
+    "Unit test."
 
-        # TODO
-        pass
-
-    test()
+    # TODO
+    pass

@@ -28,7 +28,8 @@ ShellGen - Shellcode generator library
 @var  version: Library version.
 """
 
-from base import *
+from __future__ import absolute_import
+from .base import *
 
 __all__ = [
     "version",

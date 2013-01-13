@@ -21,16 +21,12 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA 02110-1301, USA.
 
+from __future__ import absolute_import
+from ..base import Dynamic, Static
+
 __all__ = ["Breakpoint", "While1"]
 
-# For unit testing always load this version, not the one installed.
-if __name__ == '__main__':
-    import sys, os.path
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-
-from shellgen import Dynamic, Static
-
-#------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------#
 
 class Breakpoint (Dynamic):
     qualities = "stack_balanced"
@@ -49,10 +45,10 @@ class While1 (Static):
     bytes  = "\xeb\xfe"  # jmp short $-2
     length = 2
 
-#------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------#
 
-# Unit test.
-if __name__ == '__main__':
+def test():
+    "Unit test."
     assert Breakpoint.arch == "x86"
     assert Breakpoint.os == "any"
     assert While1.arch == "x86"

@@ -21,16 +21,12 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA 02110-1301, USA.
 
+from __future__ import absolute_import
+from ..base import Dynamic, Decorator
+
 __all__ = ["Nop", "Padder"]
 
-# For unit testing always load this version, not the one installed.
-if __name__ == '__main__':
-    import sys, os.path
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-
-from shellgen import Dynamic, Decorator
-
-#------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------#
 
 # TODO: randomized NOP sleds, encoding
 
@@ -44,7 +40,7 @@ class Nop (Dynamic):
     def compile(self, *argv, **argd):
         return "\x90" * self.size
 
-#------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------#
 
 class Padder (Decorator):
 
@@ -55,7 +51,8 @@ class Padder (Decorator):
     def compile(self, state):
 
         # Compile the child shellcode.
-        bytes = self.compile_children(state)
+        self.child.compile(state)
+        bytes = self.child.bytes
 
         # Get the "size" parameter.
         size = self.size
@@ -75,6 +72,11 @@ class Padder (Decorator):
         nopsled.compile(state)
         pad = nopsled.bytes
 
+        # If the pad goes before the bytes, relocate the child.
+        if size > 0:
+            self.child.relocate(len(pad))
+            bytes = self.child.bytes
+
         # If the "size" is a positive number, put the padding before the bytes.
         # If it's a negative number, put the padding after the bytes.
         if size < 0:
@@ -85,10 +87,10 @@ class Padder (Decorator):
         # Return the bytecode.
         return bytes
 
-#------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------#
 
-# Unit test.
-if __name__ == '__main__':
+def test():
+    "Unit test."
 
     assert Nop(1).length == 1
     assert Nop(0x100).length == 0x100

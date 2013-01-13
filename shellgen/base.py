@@ -24,32 +24,41 @@
 "Core features of ShellGen."
 
 import sys
-import random
 import keyword
 import weakref
 import warnings
 import functools
 
-from os import listdir, path
+from os import path
+
+__all__ = [
+
+    # Public symbols. Seen by the user.
+    "ShellcodeWarning",
+    "CompilerState",
+    "Shellcode", "Dynamic", "Static", "Raw",
+    "Container", "Concatenator", "Decorator", "Encoder", "Stager",
+
+    # Private symbols. Seen by the shellcode developer.
+    "base_dir", "base_package", "base_file",
+    "is_valid_module_path_component", "meta_canonicalize_platform_tag",
+    "meta_canonicalize_platform", "meta_canonicalize_tags",
+    "meta_canonicalize", "meta_autodetect_platform",
+    "meta_autodetect_encoding", "meta_compile", "meta_shellcode",
+    "meta_shellcode_final", "meta_shellcode_static", "meta_shellcode_raw",
+    "copy_classes",
+]
 
 # Get the path in the filesystem where this library is installed.
 base_dir = path.abspath(path.dirname(__file__))
 
-# For unit testing, fix the modules path and get our package and module name.
-if __name__ == '__main__':
-    sys.path.insert(0, path.join(base_dir, ".."))
-    base_file = path.abspath(__file__)
-    base_package = path.dirname(base_file).split(path.sep)[-1]
-    base_file = path.splitext(path.basename(base_file))[0]
-
 # When importing, get our package and module name.
 # Fail if this file's been moved elsewhere.
-else:
-    try:
-        base_package, base_file = __name__.split(".")[-2:]
-    except Exception:
-        msg = "Trying to load %s outside of its package" % __file__
-        raise ImportError(msg)
+try:
+    base_package, base_file = __name__.split(".")[-2:]
+except Exception:
+    msg = "Trying to load %s outside of its package" % __file__
+    raise ImportError(msg)
 
 #-----------------------------------------------------------------------------#
 
@@ -236,10 +245,12 @@ def meta_compile(compile):
     def compile_wrapper(self, state = None):
         if state is None:
             state = CompilerState()
-        state.next_piece()
         if hasattr(self, "_compile_hook"):
-            return self._compile_hook(compile, state)
-        return compile(self, state)
+            bytes = self._compile_hook(compile, state)
+        else:
+            bytes = compile(self, state)
+        state.next_piece( len(bytes) )
+        return bytes
 
     return compile_wrapper
 
@@ -361,11 +372,10 @@ class CompilerState (object):
     Compiler state variables.
 
     They are passed to and modified in place by all pieces of shellcode
-    during compilation, in concatenation order.
+    during compilation, in left to right order.
 
-    @type shared: dict
-    @ivar shared: Shared variables.
-        This is used to communicate things to all pieces of the shellcode.
+    @type offset: int
+    @ivar offset: Current offset in the compiled bytecode.
 
     @type  current: dict
     @param current: Current state.
@@ -376,21 +386,98 @@ class CompilerState (object):
     @param previous: Previous state.
         This is used by the previous piece of shellcode to communicate things
         to this piece, but only to this piece.
+
+    @type shared: dict
+    @ivar shared: Shared variables.
+        This is used to communicate things to all pieces of the shellcode.
+
+    @type callback: WeakValueDictionary
+    @ivar callback: Callback functions.
+        This is used to communicate things to all pieces of the shellcode.
     """
     def __init__(self):
         self.reset()
 
     def reset(self):
         "Reset the state."
-        self.shared   = {}
+        self.offset   = 0
         self.current  = {}
         self.previous = {}
+        self.shared   = {}
+        self.callback = weakref.WeakValueDictionary()
 
-    def next_piece(self):
-        "Called when moving to the next piece of shellcode."
-        self.previous = self.current
-        self.current  = {}
+    def next_piece(self, delta = 0):
+        """
+        Called when moving to the next piece of shellcode.
 
+        @type  delta: int
+        @param delta: Number of compiled bytes in this piece of shellcode.
+            It will be added to L{position}.
+        """
+        self.offset   += delta
+        self.previous  = self.current
+        self.current   = {}
+
+    def register_callback(self, name, function):
+        """
+        Register a callback function.
+
+        @note: Callbacks are stored as weak references.
+
+        @see: L{call}, L{unregister_callback}
+
+        @type  name: str
+        @param name: Name of the callback function.
+
+        @type  function: callable
+        @param function: Callback function. when called the first argument it
+            receives will be this CompilerState object.
+        """
+        self.callback[name] = function
+
+    def unregister_callback(self, name):
+        """
+        Unregister a callback function.
+
+        @note: Does not raise any exception when the callback had already been
+            unregistered, or was never registered in the first place.
+
+        @see: L{call}, L{register_callback}
+
+        @type  name: str
+        @param name: Name of the callback function.
+        """
+        try:
+            del self.callback[name]
+        except KeyError:
+            pass
+
+    def call(self, name, *argv, **argd):
+        """
+        Call a registered callback function, passing it this CompilerState
+        object as the first argument, followed by all extra arguments passed to
+        this method.
+
+        @see: L{register_callback}, L{unregister_callback}
+
+        @type  name: str
+        @param name: Name of the callback function.
+
+        @return: Return value of the callback function.
+        @raise KeyError: The callback is not registered.
+            Since callbacks are stored as weak references, they may be
+            unregistered automatically when the object they live in is
+            destroyed.
+        """
+        try:
+            function = self.callback[name]
+        except KeyError:
+            msg = ("Callback %r is not registered."
+                   " Maybe the shellcode that registered it is gone?")
+            raise KeyError(msg % name)
+        return function(self, *argv, **argd)
+
+    # XXX not sure if this should be here, it's practical but not very elegant
     def requires_nullfree(self):
         """
         @rtype:  bool
@@ -524,9 +611,72 @@ class Shellcode (object):
         """
         raise NotImplementedError("Subclasses MUST implement this method!")
 
+    def is_compiled(self):
+        """
+        Determines if the shellcode has been compiled.
+
+        A shellcode is compiled after the L{compile} method is called, and it's
+        not compiled when it hasn't been called yet or after the L{clean}
+        method is called.
+
+        For example::
+            >>> from shellgen.x86.nop import Nop
+            >>> shellcode = Nop()
+            >>> shellcode.is_compiled()
+            False
+            >>> shellcode.compile()
+            >>> shellcode.is_compiled()
+            True
+            >>> shellcode.clean()
+            >>> shellcode.is_compiled()
+            False
+            >>> shellcode.bytes     # implicit call to shellcode.compile()
+            '\x90'
+            >>> shellcode.is_compiled()
+            True
+
+        @rtype:  bool
+        @return: C{True} if the shellcode is compiled, C{False} otherwise.
+        """
+        raise NotImplementedError("Subclasses MUST implement this method!")
+
     def clean(self):
         "Clean the compilation of this shellcode."
         pass
+
+    def relocate(self, delta):
+        """
+        Relocate bytecode to the specified delta offset if possible.
+
+        @note: Note to shellcode writers:
+
+            Most shellcodes can safely ignore this, since they're position
+            independent anyways.
+
+            However, if your shellcode somehow depends on the relative position
+            of other pieces of shellcode, then you need to either update the
+            bytecode or raise an exception if it's not possible to update it.
+
+            Also, if you implement this method, don't forget to call the
+            superclass method!
+
+        @type  delta: int
+        @param delta: Delta offset.
+
+        @raise NotImplementedError: This shellcode doesn't support relocation.
+        @raise RuntimeError: An error occurred when trying to relocate.
+        """
+        unchanged = True
+        for child in self.children:
+            if not child.is_compiled():
+                unchanged = False
+            if unchanged:
+                bytes = child.bytes
+            child.relocate(delta)
+            if unchanged and bytes != child.bytes:
+                unchanged = False
+        if not unchanged and self.is_compiled():
+            self.clean()
 
     def _check_platform(self, other):
         """
@@ -599,30 +749,30 @@ class Shellcode (object):
                 tmp.remove(x)
         self.requires = tuple(tmp)
 
-    def add_feature(self, feature):
+    def add_provision(self, provision):
         """
         Add the given provided feature on runtime.
 
         @see: L{provides}
 
-        @type  feature: str
-        @param feature: Feature.
+        @type  provision: str
+        @param provision: Feature.
         """
-        provides = meta_canonicalize_tags(feature)
+        provides = meta_canonicalize_tags(provision)
         provides = meta_canonicalize_tags(self.provides + provides)
         self.provides = provides
 
-    def remove_feature(self, feature):
+    def remove_provision(self, provision):
         """
         Remove the given provided feature on runtime.
 
         @see: L{provides}
 
-        @type  feature: str
-        @param feature: Feature.
+        @type  provision: str
+        @param provision: Feature.
         """
         tmp = list(self.provides)
-        for x in meta_canonicalize_tags(feature):
+        for x in meta_canonicalize_tags(provision):
             if x in tmp:
                 tmp.remove(x)
         self.provides = tuple(tmp)
@@ -696,6 +846,9 @@ class Static (Shellcode):
 
     def compile(self, state = None):
         return self.bytes
+
+    def is_compiled(self):
+        return True
 
 #-----------------------------------------------------------------------------#
 
@@ -793,14 +946,14 @@ class Dynamic (Shellcode):
     def bytes(self):
 
         # Returns previously cached bytecode if available.
-        if self.__bytes is not None:
+        if self.is_compiled():
             return self.__bytes
 
         # Compile the shellcode.
         self.compile()
 
         # If compilation fails, raise an exception.
-        if self.__bytes is None:
+        if not self.is_compiled():
             msg = (
                 "Compilation failed. Did you forget"
                 " to return the bytecode at %s.compile?"
@@ -809,6 +962,11 @@ class Dynamic (Shellcode):
 
         # Return the compiled bytes.
         return self.__bytes
+
+    def is_compiled(self):
+
+        # It's compiled if the cache is not empty.
+        return self.__bytes is not None
 
     def clean(self):
 
@@ -1224,184 +1382,277 @@ class Stager (Dynamic):
 
 #-----------------------------------------------------------------------------#
 
-# Unit test.
-if __name__ == '__main__':
-    from shellgen import *
-    def test():
+#class Callable(Decorator):
+#    """
+#    Callable shellcodes define functions that can be called from other pieces
+#    of shellcode.
+#
+#    The child shellcode and the calling shellcodes must support relocation.
+#
+#    @see: L{relocate}
+#
+#    @type name: str
+#    @ivar name: Name of the function.
+#
+#    @type offset: int
+#    @ivar offset: Offset from the start of the complete shellcode where the
+#        function is assumed to be. This property is set automatically when
+#        compiling. See: L{CompilerState.offset}
+#    """
+#
+#    def __init__(self, child, name):
+#        """
+#        @type  child: L{Shellcode}
+#        @param child: Shellcode to be made into a function.
+#
+#        @type  name: str
+#        @param name: Name of the function.
+#            When compiling, a shared variable of this name will be stored in
+#            the L{CompilerState}. Calling shellcodes can call the function
+#            like this::
+#
+#                def compile(self, state):
+#                    bytes = ""
+#
+#                    # ...stuff...
+#
+#                    # Adds a call/branch instruction to the bytecode, that will
+#                    # execute the code of the 'example' shellcode and return.
+#                    bytes = state.call('example', bytes)
+#
+#                    # ...stuff...
+#
+#                    return bytes
+#        """
+#        super(Callable, self).__init__(child)
+#        self.name = name
+#        self.offset = 0
+#
+#    # Do not implement compile(), use make_function() instead.
+#    def compile(self, state):
+#        self.offset = state.offset
+#        child = self.child
+#        child.compile(state)
+#        bytes = self.make_function(state, child)
+#        state.register_callback(self.name, self.make_function_call)
+#        return bytes
+#
+#    def clean(self):
+#        super(Callable, self).clean()
+#        self.offset = 0
+#
+#    def make_function(self, state, child):
+#        """
+#        Turn a compiled child shellcode into a function.
+#
+#        Tipically this will be done by inserting an unconditional branch
+#        before the child code to skip it, and a return instruction at the end.
+#        """
+#        raise NotImplementedError("Subclasses MUST implement this method!")
+#
+#    def make_function_call(self, state, bytes):
+#        """
+#        Compile a call/branch instruction pointing to the child shellcode.
+#
+#        @type  state: L{CompilerState}
+#        @param state: Compilation variables.
+#
+#        @type  bytes: str
+#        @param bytes: Bytecode currently being compiled.
+#
+#        @rtype:  str
+#        @return: Bytecode currently being compiled, with the addition of a
+#            call/branch instruction pointing to the child shellcode.
+#        """
+#        raise NotImplementedError("Subclasses MUST implement this method!")
 
-        # Static subclasses shouldn't define their own compile() method.
-        try:
-            class TestStaticCompile (Static):
-                def compile(self, state):
-                    print "Static.compile() suppression failed!"
+#-----------------------------------------------------------------------------#
 
-            print "Static() verification failed!"
-            TestStaticCompile().compile()
-        except TypeError:
-            ##raise
+#class Resolver(Dynamic):
+#    """
+#    Resolver shellcodes allow access to functions in dynamic libraries.
+#
+#    This is required by some platforms like Windows, where issuing direct
+#    syscalls is not recommended.
+#    """
+
+#-----------------------------------------------------------------------------#
+
+def test():
+    "Unit test."
+
+    # Static subclasses shouldn't define their own compile() method.
+    # However this check is disabled for base.py only.
+    # This test verifies that.
+    class TestStaticCompile (Static):
+        bytes == "matanga"
+        def compile(self, state):
+            return "hola manola"
+    assert TestStaticCompile().compile() == "hola manola"
+
+    # Raw shouldn't be subclassed.
+    try:
+        class TestSubclassedRaw (Raw):
             pass
+        #print "meta_shellcode_raw() verification failed!"
+        assert False
+    except TypeError:
+        ##raise
+        pass
 
-        # Raw shouldn't be subclassed.
-        try:
-            class TestSubclassedRaw (Raw):
-                pass
-            print "meta_shellcode_raw() verification failed!"
-        except TypeError:
-            ##raise
+    # Concatenator shouldn't be subclassed.
+    try:
+        class TestSubclassedConcatenator (Concatenator):
             pass
+        #print "meta_shellcode_final() verification failed!"
+        assert False
+    except TypeError:
+        ##raise
+        pass
 
-        # Concatenator shouldn't be subclassed.
-        try:
-            class TestSubclassedConcatenator (Concatenator):
-                pass
-            print "meta_shellcode_final() verification failed!"
-        except TypeError:
-            ##raise
-            pass
+    # Test the canonicalization of the metadata in a class.
+    class TestCanonicalization(Static):
+        requires = "requires"
+        provides = ["   pro", "VideS", "PRO   "]
+        qualities = "  quali, ties  "
+        encoding = (x for x in ("en", "co", "ding"))
+        bytes = ""
+    assert TestCanonicalization.requires  == ("requires",)
+    assert TestCanonicalization.provides  == ("pro", "vides")
+    assert TestCanonicalization.qualities == ("quali", "ties")
+    assert TestCanonicalization.encoding  == ("co", "ding", "en")
 
-        # Test the canonicalization of the metadata in a class.
-        class TestCanonicalization(Static):
-            requires = "requires"
-            provides = ["   pro", "VideS", "PRO   "]
-            qualities = "  quali, ties  "
-            encoding = (x for x in ("en", "co", "ding"))
-            bytes = ""
-        assert TestCanonicalization.requires  == ("requires",)
-        assert TestCanonicalization.provides  == ("pro", "vides")
-        assert TestCanonicalization.qualities == ("quali", "ties")
-        assert TestCanonicalization.encoding  == ("co", "ding", "en")
+    # Test editing the metadata in an instance.
+    t = TestCanonicalization()
+    t.add_requirement("re")
+    t.remove_requirement("fake")
+    t.remove_requirement("requires")
+    t.add_requirement("quires")
+    assert t.requires == ("quires", "re")
+    assert t.requires != TestCanonicalization.requires
+    t.remove_provision("fake")
+    t.add_provision(" PRO VIDES ")
+    t.add_provision("\tPRO\tVIDES\t")
+    t.add_provision("PrO, VideS")
+    assert t.provides == TestCanonicalization.provides
+    t.remove_provision("pro")
+    t.add_provision("Feature")
+    assert t.provides == ("feature", "vides")
+    assert t.provides != TestCanonicalization.provides
+    t.add_quality("ti")
+    t.remove_quality("fake")
+    t.add_quality("es")
+    t.remove_quality("ties")
+    assert t.qualities == ("es", "quali", "ti")
+    assert t.qualities != TestCanonicalization.qualities
+    t.add_encoding("EN")
+    t.add_encoding("  co  ")
+    t.add_encoding("\tDiNg\t")
+    t.add_encoding(" enco  di  ")
+    t.add_encoding(" n, g ")
+    assert t.encoding == ("co", "di", "ding", "en", "enco", "g", "n")
+    assert t.encoding != TestCanonicalization.encoding
 
-        # Test editing the metadata in an instance.
-        t = TestCanonicalization()
-        t.add_requirement("re")
-        t.remove_requirement("fake")
-        t.remove_requirement("requires")
-        t.add_requirement("quires")
-        assert t.requires == ("quires", "re")
-        assert t.requires != TestCanonicalization.requires
-        t.remove_feature("fake")
-        t.add_feature(" PRO VIDES ")
-        t.add_feature("\tPRO\tVIDES\t")
-        t.add_feature("PrO, VideS")
-        assert t.provides == TestCanonicalization.provides
-        t.remove_feature("pro")
-        t.add_feature("Feature")
-        assert t.provides == ("feature", "vides")
-        assert t.provides != TestCanonicalization.provides
-        t.add_quality("ti")
-        t.remove_quality("fake")
-        t.add_quality("es")
-        t.remove_quality("ties")
-        assert t.qualities == ("es", "quali", "ti")
-        assert t.qualities != TestCanonicalization.qualities
-        t.add_encoding("EN")
-        t.add_encoding("  co  ")
-        t.add_encoding("\tDiNg\t")
-        t.add_encoding(" enco  di  ")
-        t.add_encoding(" n, g ")
-        assert t.encoding == ("co", "di", "ding", "en", "enco", "g", "n")
-        assert t.encoding != TestCanonicalization.encoding
+    # Test encoding inheritance for Container shellcodes.
+    class ExampleShellcode (Static):
+        encoding = ('unicode', 'nullfree')
+    class ExampleContainer (Container):
+        encoding = ('ascii', 'nullfree')
+    assert ExampleContainer( ExampleShellcode() ).encoding == ('nullfree',)
+    class ExampleContainer (Container):
+        pass
+    assert ExampleContainer( ExampleShellcode() ).encoding == \
+                                 ExampleShellcode.encoding
+    class ExampleContainer (Container):
+        encoding = ('ascii', 'nullfree')
+        def __init__(self, *children):
+            super(ExampleContainer, self).__init__(*children)
+            self.encoding = ExampleContainer.encoding
+    assert ExampleContainer( ExampleShellcode() ).encoding == \
+                                 ExampleContainer.encoding
 
-        # Test encoding inheritance for Container shellcodes.
-        class ExampleShellcode (Static):
-            encoding = ('unicode', 'nullfree')
-        class ExampleContainer (Container):
-            encoding = ('ascii', 'nullfree')
-        assert ExampleContainer( ExampleShellcode() ).encoding == ('nullfree',)
-        class ExampleContainer (Container):
-            pass
-        assert ExampleContainer( ExampleShellcode() ).encoding == \
-                                     ExampleShellcode.encoding
-        class ExampleContainer (Container):
-            encoding = ('ascii', 'nullfree')
-            def __init__(self, *children):
-                super(ExampleContainer, self).__init__(*children)
-                self.encoding = ExampleContainer.encoding
-        assert ExampleContainer( ExampleShellcode() ).encoding == \
-                                     ExampleContainer.encoding
+    # Test encoding overriding for Encoder shellcodes.
+    class ExampleShellcode (Static):
+        encoding = ('term_null',)
+    class ExampleEncoder (Encoder):
+        encoding = ('nullfree',)
+    assert ExampleShellcode().encoding == ('term_null',)
+    assert ExampleEncoder( ExampleShellcode() ).encoding == ('nullfree',)
 
-        # Test encoding overriding for Encoder shellcodes.
-        class ExampleShellcode (Static):
-            encoding = ('term_null',)
-        class ExampleEncoder (Encoder):
-            encoding = ('nullfree',)
-        assert ExampleShellcode().encoding == ('term_null',)
-        assert ExampleEncoder( ExampleShellcode() ).encoding == ('nullfree',)
+    # Test the platform metadata.
+    class TestArchAny(Static):
+        encoding = "unicode, nullfree"
+        bytes = "TestArchAny"
+    TestArchAny.arch = "any"
+    TestArchAny.os = "windows"
+    class TestOsAny(Static):
+        encoding = "unicode, nullfree"
+        bytes = "TestOsAny"
+    TestOsAny.arch = "x86"
+    TestOsAny.os = "any"
+    class TestArchOsAny(Static):
+        encoding = "nullfree"
+        bytes = "TestArchOsAny"
+    TestArchOsAny.arch = "any"
+    TestArchOsAny.os = "any"
+    class TestArchOsSomething(Static):
+        encoding = "ascii, nullfree"
+        bytes = "TestArchOsSomething"
+    TestArchOsSomething.arch = "x86"
+    TestArchOsSomething.os = "windows"
+    class TestArchIncompatible(Static):
+        encoding = "nullfree"
+        bytes = "TestArchIncompatible"
+    TestArchIncompatible.arch = "ppc"
+    TestArchIncompatible.os = "any"
+    class TestOsIncompatible(Static):
+        encoding = "ascii"
+        bytes = "TestOsIncompatible"
+    TestOsIncompatible.arch = "any"
+    TestOsIncompatible.os = "osx"
+    class TestArchOsIncompatible(Static):
+        encoding = "nullfree"
+        bytes = "TestArchOsIncompatible"
+    TestArchOsIncompatible.arch = "ppc"
+    TestArchOsIncompatible.os = "osx"
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        test1  = TestArchAny() + TestOsAny() + TestArchOsAny()
+        test1 += TestArchOsSomething()
+        test2  = TestArchIncompatible() + TestOsIncompatible()
+        test2 += TestArchOsIncompatible()
+        assert not w
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        test3 = test1 + test2
+        assert w
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        TestArchAny() + TestOsIncompatible()
+        assert w
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        TestOsAny() + TestArchIncompatible()
+        assert w
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        TestArchOsSomething() + TestArchOsIncompatible()
+        assert w
 
-        # Test the platform metadata.
-        class TestArchAny(Static):
-            encoding = "unicode, nullfree"
-            bytes = "TestArchAny"
-        TestArchAny.arch = "any"
-        TestArchAny.os = "windows"
-        class TestOsAny(Static):
-            encoding = "unicode, nullfree"
-            bytes = "TestOsAny"
-        TestOsAny.arch = "x86"
-        TestOsAny.os = "any"
-        class TestArchOsAny(Static):
-            encoding = "nullfree"
-            bytes = "TestArchOsAny"
-        TestArchOsAny.arch = "any"
-        TestArchOsAny.os = "any"
-        class TestArchOsSomething(Static):
-            encoding = "ascii, nullfree"
-            bytes = "TestArchOsSomething"
-        TestArchOsSomething.arch = "x86"
-        TestArchOsSomething.os = "windows"
-        class TestArchIncompatible(Static):
-            encoding = "nullfree"
-            bytes = "TestArchIncompatible"
-        TestArchIncompatible.arch = "ppc"
-        TestArchIncompatible.os = "any"
-        class TestOsIncompatible(Static):
-            encoding = "ascii"
-            bytes = "TestOsIncompatible"
-        TestOsIncompatible.arch = "any"
-        TestOsIncompatible.os = "osx"
-        class TestArchOsIncompatible(Static):
-            encoding = "nullfree"
-            bytes = "TestArchOsIncompatible"
-        TestArchOsIncompatible.arch = "ppc"
-        TestArchOsIncompatible.os = "osx"
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            test1  = TestArchAny() + TestOsAny() + TestArchOsAny()
-            test1 += TestArchOsSomething()
-            test2  = TestArchIncompatible() + TestOsIncompatible()
-            test2 += TestArchOsIncompatible()
-            assert not w
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            test3 = test1 + test2
-            assert w
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            TestArchAny() + TestOsIncompatible()
-            assert w
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            TestOsAny() + TestArchIncompatible()
-            assert w
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            TestArchOsSomething() + TestArchOsIncompatible()
-            assert w
-
-        # Test concatenation and encoding inheritance.
-        # (This is a lame test, I know. I got lazy, sorry!)
-        from shellgen.util import print_shellcode_tree
-        ##print_shellcode_tree( test3 ) # For updating the test...
-        ##sys.exit(0)                   # For updating the test...
-        from StringIO import StringIO
-        stdout = sys.stdout
-        capture = StringIO()
-        try:
-            sys.stdout = capture
-            print_shellcode_tree( test3 )
-        finally:
-            sys.stdout = stdout
-        expected = (
+    # Test concatenation and encoding inheritance.
+    # (This is a lame test, I know. I got lazy, sorry!)
+    from shellgen.util import print_shellcode_tree
+    ##print_shellcode_tree( test3 ) # For updating the test...
+    ##sys.exit(0)                   # For updating the test...
+    from StringIO import StringIO
+    stdout = sys.stdout
+    capture = StringIO()
+    try:
+        sys.stdout = capture
+        print_shellcode_tree( test3 )
+    finally:
+        sys.stdout = stdout
+    expected = (
 """Concatenator
 * Platform:  any (any)
 * Children:  2
@@ -1472,30 +1723,30 @@ if __name__ == '__main__':
         * Bytes:     5465737441726368...6d70617469626c65
 
 """)
-        ##open("1.txt","wb").write(capture.getvalue())  # for manually checking
-        ##open("2.txt","wb").write(expected)            # the differences
-        assert capture.getvalue() == expected
-        test3.compile()
-        assert test3.bytes == (
-            "TestArchAny"
-            "TestOsAny"
-            "TestArchOsAny"
-            "TestArchOsSomething"
-            "TestArchIncompatible"
-            "TestOsIncompatible"
-            "TestArchOsIncompatible"
-        )
-        ##print_shellcode_tree( test3 ) # For updating the test...
-        ##sys.exit(0)                   # For updating the test...
-        from StringIO import StringIO
-        stdout = sys.stdout
-        capture = StringIO()
-        try:
-            sys.stdout = capture
-            print_shellcode_tree( test3 )
-        finally:
-            sys.stdout = stdout
-        expected = (
+    ##open("1.txt","wb").write(capture.getvalue())  # for manually checking
+    ##open("2.txt","wb").write(expected)            # the differences
+    assert capture.getvalue() == expected
+    test3.compile()
+    assert test3.bytes == (
+        "TestArchAny"
+        "TestOsAny"
+        "TestArchOsAny"
+        "TestArchOsSomething"
+        "TestArchIncompatible"
+        "TestOsIncompatible"
+        "TestArchOsIncompatible"
+    )
+    ##print_shellcode_tree( test3 ) # For updating the test...
+    ##sys.exit(0)                   # For updating the test...
+    from StringIO import StringIO
+    stdout = sys.stdout
+    capture = StringIO()
+    try:
+        sys.stdout = capture
+        print_shellcode_tree( test3 )
+    finally:
+        sys.stdout = stdout
+    expected = (
 """Concatenator
 * Platform:  any (any)
 * Children:  2
@@ -1578,59 +1829,57 @@ if __name__ == '__main__':
         * Bytes:     5465737441726368...6d70617469626c65
 
 """)
-        ##open("1.txt","wb").write(capture.getvalue())  # for manually checking
-        ##open("2.txt","wb").write(expected)            # the differences
-        assert capture.getvalue() == expected
+    ##open("1.txt","wb").write(capture.getvalue())  # for manually checking
+    ##open("2.txt","wb").write(expected)            # the differences
+    assert capture.getvalue() == expected
 
-        # Test warnings when concatenating more than once.
-        test1 = TestArchOsAny()
-        test2 = TestArchOsAny()
-        test3 = test1 + test2
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            test4 = test1 + test2
-            assert w        # fails because test3 was the parent
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            test3 += test2
-            assert w        # fails because test4 was the parent
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            del test3
-            test4 = TestArchOsAny() + TestArchOsAny()
-            test4 += test2
-            assert not w    # now works because we deleted the parent
+    # Test warnings when concatenating more than once.
+    test1 = TestArchOsAny()
+    test2 = TestArchOsAny()
+    test3 = test1 + test2
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        test4 = test1 + test2
+        assert w        # fails because test3 was the parent
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        test3 += test2
+        assert w        # fails because test4 was the parent
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        del test3
+        test4 = TestArchOsAny() + TestArchOsAny()
+        test4 += test2
+        assert not w    # now works because we deleted the parent
 
-        # Test the dynamic shellcode's cache.
-        import random
-        class TestBytecodeCache(Dynamic):
-            def compile(self, state):
-                return "".join((chr(random.randint(0, 255))
-                                for x in xrange(random.randint(1, 16)) ))
-        test_rnd = TestBytecodeCache()
-        assert test_rnd.bytes == test_rnd.bytes
-        tmp = test_rnd.bytes
-        test_rnd.compile()
-        assert tmp != test_rnd.bytes
-        test_rnd1 = TestBytecodeCache()
-        test_rnd2 = TestBytecodeCache()
-        test_rnd3 = TestBytecodeCache()
-        test_rnd = test_rnd1 + test_rnd2 + test_rnd3
-        assert test_rnd.bytes == test_rnd.bytes
-        assert test_rnd1.bytes == test_rnd1.bytes
-        assert test_rnd2.bytes == test_rnd2.bytes
-        assert test_rnd3.bytes == test_rnd3.bytes
-        tmp = test_rnd.bytes
-        tmp1 = test_rnd1.bytes
-        tmp2 = test_rnd2.bytes
-        tmp3 = test_rnd3.bytes
-        test_rnd.compile()
-        assert tmp != test_rnd.bytes
-        assert tmp1 != test_rnd1.bytes
-        assert tmp2 != test_rnd2.bytes
-        assert tmp3 != test_rnd3.bytes
+    # Test the dynamic shellcode's cache.
+    import random
+    class TestBytecodeCache(Dynamic):
+        def compile(self, state):
+            return "".join((chr(random.randint(0, 255))
+                            for x in xrange(random.randint(1, 16)) ))
+    test_rnd = TestBytecodeCache()
+    assert test_rnd.bytes == test_rnd.bytes
+    tmp = test_rnd.bytes
+    test_rnd.compile()
+    assert tmp != test_rnd.bytes
+    test_rnd1 = TestBytecodeCache()
+    test_rnd2 = TestBytecodeCache()
+    test_rnd3 = TestBytecodeCache()
+    test_rnd = test_rnd1 + test_rnd2 + test_rnd3
+    assert test_rnd.bytes == test_rnd.bytes
+    assert test_rnd1.bytes == test_rnd1.bytes
+    assert test_rnd2.bytes == test_rnd2.bytes
+    assert test_rnd3.bytes == test_rnd3.bytes
+    tmp = test_rnd.bytes
+    tmp1 = test_rnd1.bytes
+    tmp2 = test_rnd2.bytes
+    tmp3 = test_rnd3.bytes
+    test_rnd.compile()
+    assert tmp != test_rnd.bytes
+    assert tmp1 != test_rnd1.bytes
+    assert tmp2 != test_rnd2.bytes
+    assert tmp3 != test_rnd3.bytes
 
-        # Test stage inheritance.
-        # XXX TODO
-
-    test()
+    # Test stage inheritance.
+    # XXX TODO

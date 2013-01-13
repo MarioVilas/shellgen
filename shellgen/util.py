@@ -28,24 +28,20 @@ Utility functions for ShellGen.
 @var  default_bad_chars: Default list of bad characters for encoders.
 """
 
+from __future__ import absolute_import
+from .base import *
+
+import random
+import warnings
+
+from os import listdir, path
+
 __all__ = [
     "get_shellcode_class", "get_available_platforms", "autodetect_encoding",
     "find_bad_chars", "default_bad_chars", "good_chars", "random_chars",
     "is_stack_balanced", "uses_stack", "uses_heap", "uses_seh",
-    "print_shellcode_tree",
+    "iter_shellcode", "find_shellcode", "print_shellcode_tree",
 ]
-
-# For unit testing always load this version, not the one installed.
-if __name__ == '__main__':
-    import sys, os.path
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-
-    # Now do an absolute import.
-    from shellgen.base import *
-
-# Otherwise do a relative import.
-else:
-    from base import *
 
 #-----------------------------------------------------------------------------#
 
@@ -60,6 +56,8 @@ def get_shellcode_class(arch, os, module, classname):
     Tipically exploits would directly import the shellcode classes, but this
     helper function is useful if for some reason the platform must be set
     dynamically.
+
+    @see: L{get_available_platforms}
 
     @type  arch: str
     @param arch: Target processor architecture.
@@ -108,8 +106,6 @@ def get_shellcode_class(arch, os, module, classname):
         raise NotImplementedError(msg)
     return clazz
 
-#-----------------------------------------------------------------------------#
-
 def get_available_platforms():
     """
     Get the list of available architectures from built-in shellcodes.
@@ -117,34 +113,163 @@ def get_available_platforms():
     This operation involves accessing the filesystem, so you may want to cache
     the response.
 
+    @see: L{get_available_modules}, L{get_available_classes},
+        L{get_shellcode_class}
+
     @rtype: list( tuple(str, str) )
     @return: List of available architectures from built-in shellcodes.
         Each element in the list is a tuple containing:
          - processor architecture
          - operating system
     """
+
+    # A Python trick: keep some symbols external to the function as local vars.
+    # This is faster because it avoids some name lookups in the loop below.
     isdir  = path.isdir
     isfile = path.isfile
     join   = path.join
+
+    # This list will contain the platforms we find.
     platform_list = []
+
+    # For each file and directory found in the install location...
     for arch_name in listdir(base_dir):
-        if arch_name.startswith("."):
+
+        # Skip hidden files, "." and "..", and private modules.
+        if arch_name.startswith(".") or arch_name.startswith("_"):
             continue
+
+        # Skip non-directories and directories without "__init__.py" inside.
         arch_dir = join(base_dir, arch_name)
         if not isdir(arch_dir) or not isfile(join(arch_dir, "__init__.py")):
             continue
+
+        # For each file and directory inside this directory...
         check_for_any = True
         for os_name in listdir(arch_dir):
-            if os_name.startswith("."):
+
+            # Skip hidden files, "." and "..", and private modules.
+            if os_name.startswith(".") or os_name.startswith("_"):
                 continue
+
+            # If it's a directory...
             os_dir = join(arch_dir, os_name)
-            if isdir(os_dir) and isfile(join(os_dir, "__init__.py")):
-                platform_list.append( (arch_name, os_name) )
-            elif check_for_any:
+            if isdir(os_dir):
+
+                # If it has "__init__.py" inside...
+                if isfile(join(os_dir, "__init__.py")):
+
+                    # Add the architecture and OS tuple.
+                    platform_list.append( (arch_name, os_name) )
+
+            # If it's the first .py file we see...
+            elif check_for_any and os_name.endswith(".py"):
                 check_for_any = False
+
+                # Add the architecture.
                 platform_list.append( (arch_name, "any") )
+
+    # Sort the platforms.
     platform_list.sort()
+
+    # Return the platforms.
     return platform_list
+
+def get_available_modules(arch, os):
+    """
+    Get the list of available modules with built-in shellcodes.
+
+    This operation involves accessing the filesystem, so you may want to cache
+    the response.
+
+    @see: L{get_available_platforms}
+
+    @type  arch: str
+    @param arch: Target processor architecture.
+        Must be C{None} or C{"any"} for platform independent shellcodes.
+
+    @type  os: str
+    @param os: Target operating system.
+        Must be C{None} or C{"any"} for OS independent shellcodes.
+
+    @rtype:  list(str)
+    @return: List of shellcode module names.
+    """
+
+    # Canonicalize the arch and os.
+    arch, os = meta_canonicalize_platform(arch, os)
+
+    # Build the path to the modules for that platform.
+    if os == "any":
+        platform_path = path.join(base_dir, arch)
+    else:
+        platform_path = path.join(base_dir, arch, os)
+
+    # Build the list of modules.
+    module_list = [ x[:-3] for x in listdir(platform_path)
+                      if not x.startswith("_") and x.endswith(".py")
+                         and not x.startswith("_") ]
+
+    # Sort the list of modules.
+    module_list.sort()
+
+    # Return the list of modules.
+    return module_list
+
+def get_available_classes(arch, os, module):
+    """
+    Get the list of available built-in shellcodes within the given module.
+
+    This operation involves accessing the filesystem, so you may want to cache
+    the response.
+
+    @warn: This causes the module to be imported, in order to fetch the class
+        names from it.
+
+    @see: L{get_available_modules}
+
+    @type  arch: str
+    @param arch: Target processor architecture.
+        Must be C{None} or C{"any"} for platform independent shellcodes.
+
+    @type  os: str
+    @param os: Target operating system.
+        Must be C{None} or C{"any"} for OS independent shellcodes.
+
+    @type  module: str
+    @param module: Shellcode module name.
+
+    @rtype:  list(class)
+    @return: List of shellcode classes.
+    """
+
+    # Canonicalize the arch and os.
+    arch, os = meta_canonicalize_platform(arch, os)
+
+    # Validate the module and classname.
+    if not is_valid_module_path_component(module):
+        raise ValueError("Bad shellcode module: %r" % module)
+    if not is_valid_module_path_component(classname):
+        raise ValueError("Bad shellcode class: %r" % classname)
+
+    # Build the fully qualified module name.
+    if os == "any":
+        path = "shellgen.%s.%s" % (arch, module)
+    else:
+        path = "shellgen.%s.%s.%s" % (arch, os, module)
+
+    # Load the module.
+    try:
+        modobj = __import__(path, fromlist = ["*"])
+    except ImportError, e:
+        msg = "Error loading module %s: %s" % (path, str(e))
+        raise NotImplementedError(msg)
+
+    # Return the classes that derive from Shellcode.
+    class_list = [getattr(modobj, name) for name in dir(modobj)]
+    class_list = [clazz for clazz in class_list
+                        if issubclass(clazz, Shellcode)]
+    return class_list
 
 #-----------------------------------------------------------------------------#
 
@@ -323,150 +448,218 @@ def print_shellcode_tree(shellcode, indent = 0):
     for child in shellcode.children:
         print_shellcode_tree(child, indent)
 
+def iter_shellcode(shellcode, clazz = Shellcode):
+    """
+    Iterate through all pieces of shellcode matching the given base class,
+    in left to right order.
+
+    @type  shellcode: L{Shellcode}
+    @param shellcode: Root of the shellcode tree.
+
+    @type  clazz: class
+    @param clazz: Shellcode class to look for. Matching pieces of shellcode
+        will be instances of this class or a derived class.
+
+    @rtype:  iterator of L{Shellcode}
+    @return: Iterator of matching pieces of shellcode.
+    """
+    queue = [shellcode]
+    while queue:
+        shellcode = queue.pop(0)
+        if isinstance(shellcode, clazz):
+            yield shellcode
+        queue = shellcode.children + queue
+
+def find_shellcode(shellcode, clazz):
+    """
+    Find the first matching piece of shellcode
+    that is an instance of the given class.
+
+    @type  shellcode: L{Shellcode}
+    @param shellcode: Root of the shellcode tree.
+
+    @type  clazz: class
+    @param clazz: Shellcode class to look for. Matching pieces of shellcode
+        will be instances of this class or a derived class.
+
+    @rtype:  L{Shellcode}
+    @return: Matching piece of shellcode.
+
+    @raise StopIteration: The piece of shellcode was not found.
+    """
+    return iter_shellcode(shellcode, clazz).next()
+
 #-----------------------------------------------------------------------------#
 
-# Unit test.
-if __name__ == '__main__':
-    def test():
+def test():
+    "Unit test."
 
-        # Test loading shellcode modules dynamically.
-        MyNop = get_shellcode_class("x86", "any", "nop", "Nop")
-        from shellgen.x86.nop import Nop
-        assert MyNop is Nop
-        assert Nop.arch == "x86"
-        assert Nop.os == "any"
-        MyPadder = get_shellcode_class("x86_64", None, "nop", "Padder")
-        from shellgen.x86_64.nop import Padder
-        assert MyPadder is Padder
-        assert Padder.arch == "x86_64"
-        assert Padder.os == "any"
-        MyExecute = get_shellcode_class("mips", "irix", "execute", "Execute")
-        from shellgen.mips.irix.execute import Execute
-        assert MyExecute is Execute
-        assert Execute.arch == "mips"
-        assert Execute.os == "irix"
-        try:
-            get_shellcode_class("fake", "fake", "fake", "Fake")
-            assert False
-        except NotImplementedError:
-            pass
-        except Exception:
-            assert False
-        try:
-            get_shellcode_class(".fake", "fake", "fake", "Fake")
-            assert False
-        except ValueError:
-            pass
-        except Exception:
-            assert False
-        try:
-            get_shellcode_class("fake", "/fake", "fake", "Fake")
-            assert False
-        except ValueError:
-            pass
-        except Exception:
-            assert False
-        try:
-            get_shellcode_class("fake", "fake", ".fake", "Fake")
-            assert False
-        except ValueError:
-            pass
-        except Exception:
-            assert False
-        try:
-            get_shellcode_class("fake", "fake", "fake", "Fa.ke")
-            assert False
-        except ValueError:
-            pass
-        except Exception:
-            assert False
-        try:
-            get_shellcode_class("\\fake", "fake", "fake", "Fake")
-            assert False
-        except ValueError:
-            pass
-        except Exception:
-            assert False
-        try:
-            get_shellcode_class("fake", "*fake", "fake", "Fake")
-            assert False
-        except ValueError:
-            pass
-        except Exception:
-            assert False
-        try:
-            get_shellcode_class("fake", "fake", "fake", "_Fake")
-            assert False
-        except ValueError:
-            pass
-        except Exception:
-            assert False
+    # Static subclasses shouldn't define their own compile() method.
+    # This test should have been in base.py, but this particular check
+    # is disabled for that module, so we have to do it anywhere else.
+    try:
+        class TestStaticCompile (Static):
+            def compile(self, state):
+                #print "Static.compile() suppression failed!"
+                assert False
 
-        # Test listing the available platforms.
-        platforms = get_available_platforms()
-        ##print platforms
-        assert platforms
-        assert len(set(platforms)) == len(platforms)
-        assert sorted(platforms) == platforms
-        assert all((len(x) == 2 for x in platforms))
-        assert all((x[0].lower().strip() == x[0] and x[1].lower().strip() == x[1] \
-                    for x in platforms))
+        #print "Static() verification failed!"
+        TestStaticCompile().compile()
+        assert False
+    except TypeError:
+        ##raise
+        pass
 
-        # Test character generation.
-        assert len(set(default_bad_chars)) == len(default_bad_chars)
-        assert len(set(good_chars())) == len(good_chars())
-        assert len(default_bad_chars) + len(good_chars()) == 256
-        assert set(good_chars()).isdisjoint(set(default_bad_chars))
-        assert set(random_chars(100)).isdisjoint(set(default_bad_chars))
+    # Test loading shellcode modules dynamically.
+    MyNop = get_shellcode_class("x86", "any", "nop", "Nop")
+    from shellgen.x86.nop import Nop
+    assert MyNop is Nop
+    assert Nop.arch == "x86"
+    assert Nop.os == "any"
+    MyPadder = get_shellcode_class("x86_64", None, "nop", "Padder")
+    from shellgen.x86_64.nop import Padder
+    assert MyPadder is Padder
+    assert Padder.arch == "x86_64"
+    assert Padder.os == "any"
+    MyExecute = get_shellcode_class("mips", "irix", "execute", "Execute")
+    from shellgen.mips.irix.execute import Execute
+    assert MyExecute is Execute
+    assert Execute.arch == "mips"
+    assert Execute.os == "irix"
+    try:
+        get_shellcode_class("fake", "fake", "fake", "Fake")
+        assert False
+    except NotImplementedError:
+        pass
+    except Exception:
+        assert False
+    try:
+        get_shellcode_class(".fake", "fake", "fake", "Fake")
+        assert False
+    except ValueError:
+        pass
+    except Exception:
+        assert False
+    try:
+        get_shellcode_class("fake", "/fake", "fake", "Fake")
+        assert False
+    except ValueError:
+        pass
+    except Exception:
+        assert False
+    try:
+        get_shellcode_class("fake", "fake", ".fake", "Fake")
+        assert False
+    except ValueError:
+        pass
+    except Exception:
+        assert False
+    try:
+        get_shellcode_class("fake", "fake", "fake", "Fa.ke")
+        assert False
+    except ValueError:
+        pass
+    except Exception:
+        assert False
+    try:
+        get_shellcode_class("\\fake", "fake", "fake", "Fake")
+        assert False
+    except ValueError:
+        pass
+    except Exception:
+        assert False
+    try:
+        get_shellcode_class("fake", "*fake", "fake", "Fake")
+        assert False
+    except ValueError:
+        pass
+    except Exception:
+        assert False
+    try:
+        get_shellcode_class("fake", "fake", "fake", "_Fake")
+        assert False
+    except ValueError:
+        pass
+    except Exception:
+        assert False
 
-        # Test encoding autodetection.
-        try:
-            autodetect_encoding(1)
-            assert False
-        except TypeError:
-            pass
-        try:
-            Raw(1)
-            assert False
-        except TypeError:
-            pass
-        empty_str_encoding = autodetect_encoding("")
-        assert empty_str_encoding == autodetect_encoding(None)
-        assert empty_str_encoding == Raw("").encoding
-        assert empty_str_encoding == Raw(Raw("")).encoding
-        assert empty_str_encoding == autodetect_encoding(Raw(""))
-        assert "nullfree" in autodetect_encoding(random_chars(100))
-        assert "nullfree" in Raw(random_chars(100)).encoding
-        encoding_test_data = {
-            "": ('alpha', 'ascii', 'lower', 'nullfree', 'unicode', 'upper'),
-            "\x00": ('alpha', 'ascii', 'lower', 'term_null', 'upper'),
-            "\x00\x00": ('alpha', 'ascii', 'lower', 'unicode', 'upper'),
-            "hola manola\x00": ('ascii', 'lower', 'term_null'),
-            "HOLA MANOLA\x00": ('ascii', 'term_null', 'upper'),
-            "Hola Manola": ('ascii', 'nullfree'),
-            "matanga\x00": ('alpha', 'ascii', 'lower', 'term_null'),
-            "MATANGA\x00": ('alpha', 'ascii', 'term_null', 'upper'),
-            "Matanga": ('alpha', 'ascii', 'nullfree'),
-            "h\0o\0l\0a\0 \0m\0a\0n\0o\0l\0a\0": ('ascii', 'lower', 'unicode'),
-            "h\0o\0l\0a\0 \0m\0a\0n\0o\0l\0a\0\0": ('ascii', 'lower'),              # unaligned size
-            "\0h\0o\0l\0a\0 \0m\0a\0n\0o\0l\0a\0\0": ('ascii', 'lower'),            # unaligned address
-            "h\0o\0l\0a\0 \0m\0a\0n\0o\0l\0a\0\0\0": ('ascii', 'lower', 'term_null', 'unicode'),
-            "M\0A\0T\0A\0N\0G\0A\0": ('alpha', 'ascii', 'unicode', 'upper'),
-            "M\0A\0T\0A\0N\0G\0A\0\0": ('alpha', 'ascii', 'upper'),                 # unaligned size
-            "\0M\0A\0T\0A\0N\0G\0A\0": ('alpha', 'ascii', 'upper'),                 # unaligned address
-            "M\0A\0T\0A\0N\0G\0A\0\0\0": ('alpha', 'ascii', 'term_null', 'unicode', 'upper'),
-            "Matanga!": ('ascii', 'nullfree'),
-            chr(128): ('lower', 'nullfree', 'upper'),
-            (chr(128) + chr(0)): ('lower', 'term_null', 'unicode', 'upper'),
-            (chr(128) + chr(128) + chr(0)): ('lower', 'term_null', 'upper'),
-            (chr(128) + chr(0) + chr(128)): ('lower', 'upper'),
-            default_bad_chars: ('ascii', 'lower', 'upper'),
-            good_chars(): ('nullfree',),
-        }
-        for test_str, test_result in encoding_test_data.iteritems():
-            if autodetect_encoding(test_str) != test_result:
-                raise AssertionError("autodetect_encoding() test failed: %r" % test_str)
-            if Raw(test_str).encoding != test_result:
-                raise AssertionError("Raw() test failed: %r" % test_str)
+    # Test listing the available platforms.
+    platforms = get_available_platforms()
+    ##print platforms
+    assert platforms
+    assert len(set(platforms)) == len(platforms)
+    assert sorted(platforms) == platforms
+    assert all((len(x) == 2 for x in platforms))
+    assert all((x[0].lower().strip() == x[0] and x[1].lower().strip() == x[1] \
+                for x in platforms))
 
-    test()
+    # Test character generation.
+    assert len(set(default_bad_chars)) == len(default_bad_chars)
+    assert len(set(good_chars())) == len(good_chars())
+    assert len(default_bad_chars) + len(good_chars()) == 256
+    assert set(good_chars()).isdisjoint(set(default_bad_chars))
+    assert set(random_chars(100)).isdisjoint(set(default_bad_chars))
+
+    # Test encoding autodetection.
+    try:
+        autodetect_encoding(1)
+        assert False
+    except TypeError:
+        pass
+    try:
+        Raw(1)
+        assert False
+    except TypeError:
+        pass
+    empty_str_encoding = autodetect_encoding("")
+    assert empty_str_encoding == autodetect_encoding(None)
+    assert empty_str_encoding == Raw("").encoding
+    assert empty_str_encoding == Raw(Raw("")).encoding
+    assert empty_str_encoding == autodetect_encoding(Raw(""))
+    assert "nullfree" in autodetect_encoding(random_chars(100))
+    assert "nullfree" in Raw(random_chars(100)).encoding
+    encoding_test_data = {
+        "": ('alpha', 'ascii', 'lower', 'nullfree', 'unicode', 'upper'),
+        "\x00": ('alpha', 'ascii', 'lower', 'term_null', 'upper'),
+        "\x00\x00": ('alpha', 'ascii', 'lower', 'unicode', 'upper'),
+        "hola manola\x00": ('ascii', 'lower', 'term_null'),
+        "HOLA MANOLA\x00": ('ascii', 'term_null', 'upper'),
+        "Hola Manola": ('ascii', 'nullfree'),
+        "matanga\x00": ('alpha', 'ascii', 'lower', 'term_null'),
+        "MATANGA\x00": ('alpha', 'ascii', 'term_null', 'upper'),
+        "Matanga": ('alpha', 'ascii', 'nullfree'),
+        "h\0o\0l\0a\0 \0m\0a\0n\0o\0l\0a\0": ('ascii', 'lower', 'unicode'),
+        "h\0o\0l\0a\0 \0m\0a\0n\0o\0l\0a\0\0": ('ascii', 'lower'),              # unaligned size
+        "\0h\0o\0l\0a\0 \0m\0a\0n\0o\0l\0a\0\0": ('ascii', 'lower'),            # unaligned address
+        "h\0o\0l\0a\0 \0m\0a\0n\0o\0l\0a\0\0\0": ('ascii', 'lower', 'term_null', 'unicode'),
+        "M\0A\0T\0A\0N\0G\0A\0": ('alpha', 'ascii', 'unicode', 'upper'),
+        "M\0A\0T\0A\0N\0G\0A\0\0": ('alpha', 'ascii', 'upper'),                 # unaligned size
+        "\0M\0A\0T\0A\0N\0G\0A\0": ('alpha', 'ascii', 'upper'),                 # unaligned address
+        "M\0A\0T\0A\0N\0G\0A\0\0\0": ('alpha', 'ascii', 'term_null', 'unicode', 'upper'),
+        "Matanga!": ('ascii', 'nullfree'),
+        chr(128): ('lower', 'nullfree', 'upper'),
+        (chr(128) + chr(0)): ('lower', 'term_null', 'unicode', 'upper'),
+        (chr(128) + chr(128) + chr(0)): ('lower', 'term_null', 'upper'),
+        (chr(128) + chr(0) + chr(128)): ('lower', 'upper'),
+        default_bad_chars: ('ascii', 'lower', 'upper'),
+        good_chars(): ('nullfree',),
+    }
+    for test_str, test_result in encoding_test_data.iteritems():
+        if autodetect_encoding(test_str) != test_result:
+            raise AssertionError("autodetect_encoding() test failed: %r" % test_str)
+        if Raw(test_str).encoding != test_result:
+            raise AssertionError("Raw() test failed: %r" % test_str)
+
+    # Test shellcode finding and iteration.
+    class TestShellcode1(Static):
+        bytes = "test1"
+    class TestShellcode2(Static):
+        bytes = "test2"
+    test1 = TestShellcode1()
+    test2 = TestShellcode2()
+    test3 = test1 + test2
+    assert find_shellcode(test3, TestShellcode1) is test1
+    assert find_shellcode(test3, TestShellcode2) is test2
+    assert find_shellcode(test3, Concatenator)   is test3
+    assert list(iter_shellcode(test3, Static)) == [test1, test2]
+    assert list(iter_shellcode(test3)) == [test3, test1, test2]
