@@ -114,47 +114,72 @@ class NullFreeEncoder (Encoder):
             # XOR-encode the bytes.
             child_bytes = self.encode_8(child_bytes, key)
 
-        # If we can't, try again with a 32-bit XOR key.
+        # If we can't, try again with a variable size XOR key.
         except EncodingError:
 
             # Remember we failed with 8 bits so we don't try next time.
             self.__try_8_bit = False
 
-            # Align the child shellcode size to 32 bits.
-            child_bytes = self.align_32(child_bytes)
+            # For each possible key size...
+            key_size = 4
+            while 1:
+                try:
 
-            # Calculate a XOR key.
-            key = self.find_key_32(child_bytes)
+                    # Align the child shellcode size.
+                    child_bytes = self.align(child_bytes, key_size)
 
-            # Compile the decoder stub.
-            decoder, key_delta = self.get_decoder_32(key)
+                    # Calculate a XOR key.
+                    key = self.find_key(child_bytes, key_size)
 
-            # Relocate the child.
-            delta = len(prefix) + len(decoder) - delta
-            if delta:
-                child.relocate(delta)
+                    # Compile the decoder stub.
+                    decoder, key_deltas = self.get_decoder(key)
 
-                # Align the relocated child shellcode size to 32 bits.
-                relocated_child_bytes = self.align_32(relocated_child_bytes)
+                    # Relocate the child.
+                    delta = len(prefix) + len(decoder) - delta
+                    if delta:
+                        child.relocate(delta)
 
-                # Did the child change due to relocation?
-                relocated_child_bytes = child.bytes
-                if relocated_child_bytes != child_bytes:
+                        # Align the relocated child shellcode size to 32 bits.
+                        relocated_child_bytes = self.align(
+                                                        relocated_child_bytes,
+                                                        key_size)
 
-                    # Remember the child is position dependent.
-                    self._position_dependent = True
+                        # Did the child change due to relocation?
+                        relocated_child_bytes = child.bytes
+                        if relocated_child_bytes != child_bytes:
 
-                    # Recalculate the XOR key.
-                    key = self.find_key_32(child_bytes)
+                            # Remember the child is position dependent.
+                            self._position_dependent = True
 
-                    # Patch the decoder stub.
-                    decoder = patch_decoder_32(decoder, key_delta, key)
+                            # Recalculate the XOR key.
+                            key = self.find_key(child_bytes, key_size)
 
-                    # Use the relocated child bytes.
-                    child_bytes = relocated_child_bytes
+                            # Patch the decoder stub.
+                            decoder = patch_decoder(decoder, key_deltas, key)
+
+                            # Use the relocated child bytes.
+                            child_bytes = relocated_child_bytes
+
+                    # We've done it! Break out of the loop.
+                    break
+
+                # We failed, there's no valid key for this size.
+                except EncodingError:
+
+                    # Try again with a bigger key.
+                    # TODO: Maybe allow the decoder to have non-aligned keys?
+                    key_size += 4
+
+                    # The key can't be larger than the child shellcode.
+                    # (FIXME: It could be equal, but that would make a very
+                    # inefficient decoder stub. Another algorithm would be
+                    # needed for pathological cases - then we'll measure the
+                    # size of the decoder stub + the child shellcode instead.)
+                    if key_size > len(child_bytes):
+                        raise
 
             # XOR-encode the bytes.
-            child_bytes = self.encode_32(child_bytes, key)
+            child_bytes = self.encode(child_bytes, key)
 
         # Return the decoder stub + the encoded bytes.
         return prefix + decoder + child_bytes
@@ -171,7 +196,7 @@ class NullFreeEncoder (Encoder):
         @return: 8-bit XOR key.
         """
 
-        # Pick a random character that's not present in the shellcode.
+        # Pick any character that's not present in the shellcode.
         used_chars = {ord(char) for char in bytes}
         free_chars = set(xrange(256))
         free_chars.difference_update(used_chars)
@@ -193,7 +218,7 @@ class NullFreeEncoder (Encoder):
         """
 
         #
-        # TODO
+        # XXX TODO
         #
 
     @staticmethod
@@ -213,110 +238,106 @@ class NullFreeEncoder (Encoder):
         return "".join( ( chr(ord(c) ^ key) for c in bytes ) )
 
     @staticmethod
-    def align_32(bytes):
+    def align(bytes, key_size):
         """
-        Pad the bytecode with NOP instructions to a align its size to 32 bits.
+        Pad the bytecode with NOP instructions to a align its size to n bytes.
 
         @type  bytes: str
         @param bytes: Bytecode to align.
 
+        @type  key_size: int
+        @param key_size: Byte size to align the shellcode to.
+
         @rtype:  str
         @return: Aligned bytecode.
         """
-        if len(bytes) & 3:
-            bytes += "\x90" * (3 - (len(bytes) & 3))
+        tail = len(bytes) % key_size
+        if tail:
+            bytes += "\x90" * (key_size - tail)
         return bytes
 
     @staticmethod
-    def find_key_32(bytes):
+    def find_key(bytes, key_size):
         """
-        Find a suitable 32-bit XOR key for the given bytecode.
+        Find a suitable n-byte XOR key for the given bytecode.
 
         @type  bytes: str
-        @param bytes: Bytecode to encode. Its size must be aligned to 32 bits.
+        @param bytes: Bytecode to encode. Its size must be aligned to n bytes.
 
-        @rtype:  int
-        @return: 32-bit XOR key.
+        @type  key_size: int
+        @param key_size: Size of the key, in bytes.
+
+        @rtype:  str
+        @return: n-byte XOR key, packed as a string.
         """
 
-        # Get the frequency and DWORD-relative position of all characters.
-        frequency = collections.defaultdict(int)
-        position  = collections.defaultdict(set)
+        # Precalculate the range of possible keysize-relative positions.
+        key_range = range(key_size)
+
+        # Find the keysize-relative position of all characters.
+        position = tuple([set() for _ in key_range])
         for index in xrange(len(bytes)):
             char = bytes[index]
-            frequency[char] += 1
-            position[char].add( index & 3 )
-        frequency = dict(frequency)
-        position  = dict(position)
+            position[index & 3].add(char)
 
-        # Remove 0 and all characters that appear in all 4 positions, and
-        # convert the positions occupied into available.
-        try:
-            del frequency["\x00"]
-            del position["\x00"]
-        except KeyError:
-            pass    # should never happen...
-        all_positions = {0, 1, 2, 3}
-        for char, pos in position.keys():
-            if len(pos) == 4:
-                del frequency[char]
-                del position[char]
-            else:
-                position[char].difference_update(all_positions)
+        # For each keysize-relative position find the characters that are NOT
+        # there, from those pick any character, and combine it into the key.
+        # If there are no candidates for this position, then there's no valid
+        # key for this size.
+        key = ""
+        all = set(key_range)
+        randint = random.randint
+        for index in key_range:
+            candidates = position[index]
+            candidates.difference_update(all)
+            if not candidates:
+                raise EncodingError()
+            key += tuple(candidates)[randint(0, len(candidates))]
 
-        # Sort the candidate characters, the least likely to appear goes first.
-        candidates = [ (y, x) for (x, y) in frequency.iteritems() ]
-        candidates.sort()
-        candidates = [ t[0] for t in candidates ]
-
-        # Try picking all possible combinations until one is valid.
-
-        #
-        # TODO
-        #
-
-        # If there's no valid combination, fail with an exception.
-        raise EncodingError()
+        # Return the key.
+        return key
 
     @staticmethod
-    def get_decoder_32(key):
+    def get_decoder(key):
         """
-        Get the decoder stub bytecode for the 32-bit XOR algorithm.
+        Get the decoder stub bytecode for the variable size XOR algorithm.
 
-        @type  key: int
-        @param key: 32-bit XOR key.
+        @type  key: str
+        @param key: XOR key.
 
         @rtype:  str
         @return: Decoder stub bytecode.
         """
 
         #
-        # TODO
+        # XXX TODO
         #
 
     @staticmethod
-    def encode_32(bytes, key):
+    def encode(bytes, key):
         """
-        Encode the bytecode with the given 32-bit XOR key.
+        Encode the bytecode with the given variable size XOR key.
 
         @type  bytes: str
-        @param bytes: Bytecode to encode. Its size must be aligned to 32 bits.
+        @param bytes: Bytecode to encode.
+            Its size must be aligned to the size of the key.
 
-        @type  key: int
-        @param key: 32-bit XOR key.
+        @type  key: str
+        @param key: XOR key.
 
         @rtype:  str
         @return: Encoded bytecode.
+
+        @raise ValueError:
+            The bytecode size must be aligned to the size of the key.
         """
-        if len(bytes) & 3:
-            raise ValueError("The bytecode size must be aligned to 32 bits")
-        if bit_length(key) > 32:
-            raise ValueError("The XOR key must fit in 32 bits")
-        pack = struct.pack
-        unpack = struct.unpack
+        if len(bytes) % len(key):
+            raise ValueError(
+                "The bytecode size must be aligned to the size of the key.")
+        pad = key * (len(bytes) / len(key))
+        # TODO: Maybe using pack and unpack is faster? Benchmark!
         return "".join(
-            (pack("<L", unpack("<L", bytes[i:i+4])[0] ^ key)
-             for i in xrange(0, len(bytes), 4))
+            [ chr( ord(bytes[i]) ^ ord(pad[i]) ) for i in xrange(len(bytes)) ]
         )
 
 #-----------------------------------------------------------------------------#
