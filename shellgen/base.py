@@ -34,7 +34,7 @@ from os import path
 __all__ = [
 
     # Public symbols. Seen by the user.
-    "ShellcodeWarning",
+    "ShellcodeWarning", "CompileError", "EncodingError",
     "CompilerState",
     "Shellcode", "Dynamic", "Static", "Raw",
     "Container", "Concatenator", "Decorator", "Encoder", "Stager",
@@ -365,6 +365,17 @@ def copy_classes(all, name, namespace):
 class ShellcodeWarning (RuntimeWarning):
     "Warnings issued by this library are of this type."
 
+class CompileError (RuntimeError):
+    "An error occurred when compiling the shellcode."
+
+    def __init__(self, message = None):
+        if not message:
+            message = self.__doc__
+        RuntimeError.__init__(self, message)
+
+class EncodingError (CompileError):
+    "A compile error occurred when trying to meet the encoding requirements."
+
 #-----------------------------------------------------------------------------#
 
 class CompilerState (object):
@@ -666,17 +677,18 @@ class Shellcode (object):
         @raise NotImplementedError: This shellcode doesn't support relocation.
         @raise RuntimeError: An error occurred when trying to relocate.
         """
-        unchanged = True
-        for child in self.children:
-            if not child.is_compiled():
-                unchanged = False
-            if unchanged:
-                bytes = child.bytes
-            child.relocate(delta)
-            if unchanged and bytes != child.bytes:
-                unchanged = False
-        if not unchanged and self.is_compiled():
-            self.clean()
+        if delta != 0:
+            unchanged = True
+            for child in self.children:
+                if not child.is_compiled():
+                    unchanged = False
+                if unchanged:
+                    bytes = child.bytes
+                child.relocate(delta)
+                if unchanged and bytes != child.bytes:
+                    unchanged = False
+            if not unchanged and self.is_compiled():
+                self.clean()
 
     def _check_platform(self, other):
         """

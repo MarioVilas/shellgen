@@ -23,19 +23,11 @@
 
 from __future__ import absolute_import
 from ..base import Dynamic
+from ..util import bit_length
 
 import struct
 
 __all__ = ["SubSP", "AllocaProbe"]
-
-# Compatibility with Python 2.6 and earlier.
-if hasattr(int, "bit_length"):
-    def bit_length(num):
-        return num.bit_length()
-else:
-    import math
-    def bit_length(num):
-        return int(math.log(num, 2))
 
 #-----------------------------------------------------------------------------#
 

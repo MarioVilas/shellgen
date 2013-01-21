@@ -37,11 +37,82 @@ import warnings
 from os import listdir, path
 
 __all__ = [
+    "bit_length", "compile_child",
     "get_shellcode_class", "get_available_platforms", "autodetect_encoding",
     "find_bad_chars", "default_bad_chars", "good_chars", "random_chars",
     "is_stack_balanced", "uses_stack", "uses_heap", "uses_seh",
     "iter_shellcode", "find_shellcode", "print_shellcode_tree",
 ]
+
+#-----------------------------------------------------------------------------#
+
+# Compatibility with Python 2.6 and earlier.
+if hasattr(int, "bit_length"):
+    def bit_length(num):
+        return num.bit_length()
+else:
+    import math
+    def bit_length(num):
+        return int(math.log(num, 2))
+
+#-----------------------------------------------------------------------------#
+
+def compile_child(shellcode, state = None,
+                    current_offset = None,
+                   preserve_offset = True,
+                    preserve_state = True):
+    """
+    Compiles the given shellcode under special circumstances.
+
+    Using the C{current_offset} option, compilation assumes the given offset
+    instead of the value from L{CompilerState.offset}.
+
+    Using the C{preserve_offset} option, the current offset is not modified
+    after compiling the shellcode.
+
+    Using the C{preserve_state} you can control whether the state reflects that
+    another shellcode has been compiled, or it's treated as part as the
+    currently compiling shellcode.
+
+    @type  shellcode: L{Shellcode}
+    @param shellcode: Shellcode to compile.
+
+    @type  state: L{CompilerState}
+    @param state: Compilation state.
+
+    @type  current_offset: int
+    @param current_offset: The current offset to use.
+
+    @type  preserve_offset: bool
+    @param preserve_offset: C{True} to preserve the offset, C{False} to update
+        the offset after compilation.
+
+    @type  preserve_state: bool
+    @param preserve_state: C{True} to compile within the state context of the
+        caller, C{False} to compile normally.
+
+    @rtype:  str
+    @return: Compiled bytecode.
+    """
+    if not state:
+        state = CompilerState()
+        if current_offset:
+            state.offset = current_offset
+    elif not current_offset:
+        current_offset = state.offset
+    old_offset  = state.offset
+    old_current = state.current
+    try:
+        state.offset = current_offset
+        if preserve_state:
+            state.current = state.previous
+        shellcode.compile(state)
+    finally:
+        if preserve_offset:
+            state.offset  = old_offset
+        if preserve_state:
+            state.current = old_current
+    return shellcode.bytes
 
 #-----------------------------------------------------------------------------#
 
