@@ -36,7 +36,25 @@ __all__ = ["NullFreeEncoder"]
 #-----------------------------------------------------------------------------#
 
 class NullFreeEncoder (Encoder):
-    encoding = "nullfree"
+    encoding  = "nullfree"
+    qualities = "stack_balanced"
+
+    # Bytecode for the 8-bit XOR decoder stub (13 bytes).
+    __decoder_stub_8 = (
+        "\x83\xC6\x0D"  #             add esi, 13
+        "\x89\xF7"      #             mov edi, esi
+        "\xAC"          # decrypt:    lodsb
+        "\x34\xFF"      #             xor al, 255       ; key
+        "\xAA"          #             stosb
+        "\x3C\xFE"      #             cmp al, 254       ; terminator
+        "\x75\xFA"      #             jnz decrypt
+    )
+
+    # Delta offset where to patch the 8-bit XOR decoder stub to set the key.
+    __decoder_stub_delta_key_8 = 7
+
+    # Delta where to patch the 8-bit XOR decoder stub to set the terminator.
+    __decoder_stub_delta_terminator_8 = 10
 
     def __init__(self, child):
         super(NullFreeEncoder, self).__init__(child)
@@ -73,9 +91,28 @@ class NullFreeEncoder (Encoder):
         # If a PC register was not given, prepend a GetPC automatically.
         prefix = ""
         if not pc:
-            getpc  = GetPC()
+            getpc  = GetPC(pcreg = "esi")
             prefix = getpc.bytes
             pc     = getpc.pcreg
+
+        # The decoder stub expects the PC register to be ESI.
+        if not pc:
+            raise CompileError("Invalid PC register: %r" % pc)
+        pc = pc.strip().lower()
+        if pc != "esi":
+            push = {
+                "eax" : "\x50",     # push eax
+                "ecx" : "\x51",     # push ecx
+                "edx" : "\x52",     # push edx
+                "ebx" : "\x53",     # push ebx
+                "esp" : "\x54",     # push esp
+                "ebp" : "\x55",     # push ebp
+                "esi" : "\x56",     # push esi
+                "edi" : "\x57",     # push edi
+            }
+            if pc not in push:
+                raise CompileError("Invalid PC register: %r" % pc)
+            prefix += push[pc] + "\x5E" # push reg32 / pop esi
 
         # Try encoding with an 8-bit XOR key first.
         delta = 0
@@ -86,10 +123,10 @@ class NullFreeEncoder (Encoder):
                 raise EncodingError()
 
             # Calculate a XOR key.
-            key = self.find_key_8(child_bytes)
+            key, terminator = self.find_key_8(child_bytes)
 
             # Compile the decoder stub.
-            decoder, key_delta = self.get_decoder_8(key)
+            decoder = self.get_decoder_8(key, terminator)
 
             # Relocate the child.
             delta = len(prefix) + len(decoder)
@@ -103,16 +140,16 @@ class NullFreeEncoder (Encoder):
                 self._position_dependent = True
 
                 # Recalculate the XOR key.
-                key = self.find_key_8(relocated_child_bytes)
+                key, terminator = self.find_key_8(relocated_child_bytes)
 
                 # Patch the decoder stub.
-                decoder = patch_decoder_8(decoder, key_delta, key)
+                decoder = self.get_decoder_8(key, terminator)
 
                 # Use the relocated child bytes.
                 child_bytes = relocated_child_bytes
 
             # XOR-encode the bytes.
-            child_bytes = self.encode_8(child_bytes, key)
+            child_bytes = self.encode_8(child_bytes, key, terminator)
 
         # If we can't, try again with a variable size XOR key.
         except EncodingError:
@@ -185,6 +222,27 @@ class NullFreeEncoder (Encoder):
         return prefix + decoder + child_bytes
 
     @staticmethod
+    def get_decoder_8(key, terminator):
+        """
+        Get the decoder stub bytecode for the 8-bit XOR algorithm.
+
+        @type  key: str
+        @param key: XOR key.
+
+        @type  terminator: str
+        @param terminator: 8-bit terminator.
+
+        @rtype:  str
+        @return: Decoder stub bytecode.
+        """
+        delta_key = self.__decoder_stub_delta_key_8
+        delta_term = self.__decoder_stub_delta_terminator_8
+        decoder = self.__decoder_stub_8
+        decoder = decoder[:delta_key]  + key        + decoder[ delta_key+1:]
+        decoder = decoder[:delta_term] + terminator + decoder[delta_term+1:]
+        return decoder
+
+    @staticmethod
     def find_key_8(bytes):
         """
         Find a suitable 8-bit XOR key for the given bytecode.
@@ -192,50 +250,46 @@ class NullFreeEncoder (Encoder):
         @type  bytes: str
         @param bytes: Bytecode to encode. Its size must be aligned to 32 bits.
 
-        @rtype:  int
-        @return: 8-bit XOR key.
+        @rtype:  tuple(str, str)
+        @return: 8-bit XOR key, and 8-bit terminator.
         """
 
         # Pick any character that's not present in the shellcode.
-        used_chars = {ord(char) for char in bytes}
-        free_chars = set(xrange(256))
+        used_chars = set(bytes)
+        free_chars = set( struct.pack("B" * 255, *xrange(1, 255)) )
         free_chars.difference_update(used_chars)
-        if not free_chars:
+        if len(free_chars) < 2:
             raise EncodingError()
         candidates = list(free_chars)
-        return candidates[ random.randint(0, len(candidates) - 1) ]
+        key = candidates[ random.randint(0, len(candidates) - 1) ]
+        candidates.remove(key)
+        terminator = candidates[ random.randint(0, len(candidates) - 1) ]
+        return key, terminator
 
     @staticmethod
-    def get_decoder_8(key):
-        """
-        Get the decoder stub bytecode for the 8-bit XOR algorithm.
-
-        @type  key: int
-        @param key: 8-bit XOR key.
-
-        @rtype:  str
-        @return: Decoder stub bytecode.
-        """
-
-        #
-        # XXX TODO
-        #
-
-    @staticmethod
-    def encode_8(bytes, key):
+    def encode_8(bytes, key, terminator):
         """
         Encode the bytecode with the given 8-bit XOR key.
 
         @type  bytes: str
-        @param bytes: Bytecode to encode. Its size must be aligned to 32 bits.
+        @param bytes: Bytecode to encode.
 
-        @type  key: int
+        @type  key: str
         @param key: 8-bit XOR key.
+
+        @type  terminator: str
+        @param terminator: 8-bit terminator.
 
         @rtype:  str
         @return: Encoded bytecode.
         """
-        return "".join( ( chr(ord(c) ^ key) for c in bytes ) )
+        bytes = bytes + terminator
+        fmt = "B" * len(bytes)
+        unpack = struct.unpack
+        pad = unpack("B", key) * len(bytes)
+        bytes = unpack(fmt, bytes)
+        bytes = [ bytes[i] ^ pad[i] for i in xrange(len(bytes)) ]
+        return struct.pack(fmt, *bytes)
 
     @staticmethod
     def align(bytes, key_size):
@@ -292,7 +346,7 @@ class NullFreeEncoder (Encoder):
             candidates.difference_update(all)
             if not candidates:
                 raise EncodingError()
-            key += tuple(candidates)[randint(0, len(candidates))]
+            key += tuple(candidates)[ randint(0, len(candidates)) ]
 
         # Return the key.
         return key
@@ -313,6 +367,8 @@ class NullFreeEncoder (Encoder):
         # XXX TODO
         #
 
+        raise NotImplementedError()
+
     @staticmethod
     def encode(bytes, key):
         """
@@ -320,27 +376,26 @@ class NullFreeEncoder (Encoder):
 
         @type  bytes: str
         @param bytes: Bytecode to encode.
-            Its size must be aligned to the size of the key.
 
         @type  key: str
         @param key: XOR key.
 
         @rtype:  str
         @return: Encoded bytecode.
-
-        @raise ValueError:
-            The bytecode size must be aligned to the size of the key.
         """
+        unpack = struct.unpack
+        fmt = "B" * len(bytes)
+        bytes = unpack(fmt, bytes)
+        key = unpack("B" * len(key), key)
+        pad_size = len(bytes) / len(key)
         if len(bytes) % len(key):
-            raise ValueError(
-                "The bytecode size must be aligned to the size of the key.")
-        pad = key * (len(bytes) / len(key))
-        # TODO: Maybe using pack and unpack is faster? Benchmark!
-        return "".join(
-            [ chr( ord(bytes[i]) ^ ord(pad[i]) ) for i in xrange(len(bytes)) ]
-        )
+            pad_size += 1
+        pad = key * pad_size
+        bytes = [ bytes[i] ^ pad[i] for i in xrange(len(bytes)) ]
+        return struct.pack(fmt, *bytes)
 
 #-----------------------------------------------------------------------------#
 
+# Unit test.
 def test():
-    pass
+    raise NotImplementedError()

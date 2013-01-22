@@ -37,7 +37,7 @@ class GetPC (Dynamic):
     encoding  = "nullfree"
     length    = 10
 
-    def __init__(self, pcreg = "ecx"):
+    def __init__(self, pcreg = "esi"):
         self.pcreg = pcreg
 
     def compile(self, state):
@@ -101,7 +101,7 @@ class GetPC_Alt (Dynamic):
     encoding  = "nullfree"
     length    = 10
 
-    def __init__(self, pcreg = "ecx"):
+    def __init__(self, pcreg = "esi"):
         self.pcreg = pcreg
 
     def compile(self, state):
@@ -183,7 +183,7 @@ class GetPC_FPU (Dynamic):
     encoding  = "nullfree"
     length    = 10
 
-    def __init__(self, pcreg = "ecx"):
+    def __init__(self, pcreg = "esi"):
         self.pcreg = pcreg
 
     def compile(self, state):
@@ -233,7 +233,7 @@ class GetPC_Wrapper (Decorator):
     provides  = "pc"
     encoding  = "nullfree"
 
-    def __init__(self, child, pcreg = "ecx"):
+    def __init__(self, child, pcreg = "esi"):
         super(GetPC_Wrapper, self).__init__(child)
         self.pcreg = pcreg
 
