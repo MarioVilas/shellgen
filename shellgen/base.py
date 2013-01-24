@@ -245,6 +245,7 @@ def meta_compile(compile):
     def compile_wrapper(self, state = None):
         if state is None:
             state = CompilerState()
+        self.offset = state.offset
         if hasattr(self, "_compile_hook"):
             bytes = self._compile_hook(compile, state)
         else:
@@ -529,6 +530,10 @@ class Shellcode (object):
     @type parent: L{Container}
     @ivar parent: Parent shellcode.
 
+    @type offset: int
+    @ivar offset: Current offset assumed when compiling.
+        Filled in automatically during compilation.
+
     @type bytes: str
     @ivar bytes: Compiled bytecode for this shellcode.
         May raise an exception on compilation errors.
@@ -580,6 +585,9 @@ class Shellcode (object):
     encoding  = ()
 
     # TO DO: helper functions to check dependencies and constraints
+
+    # Default to offset 0.
+    offset = 0
 
     # Weak reference to the parent node.
     # Updated externally on object instances only by Containers.
@@ -657,7 +665,9 @@ class Shellcode (object):
 
     def relocate(self, delta):
         """
-        Relocate bytecode to the specified delta offset if possible.
+        Relocate bytecode by the specified delta offset if possible.
+
+        The L{offset} instance variable will be incremented by C{delta}.
 
         @note: Note to shellcode writers:
 
@@ -677,7 +687,23 @@ class Shellcode (object):
         @raise NotImplementedError: This shellcode doesn't support relocation.
         @raise RuntimeError: An error occurred when trying to relocate.
         """
+        #
+        # XXX TODO
+        #
+        # Some serious rethinking is needed for this feature, I fear it'll be
+        # insufficient and cumbersome as it is now. Ideally relocations should
+        # be dealt with in a fully automated way whenever possible!
+        #
+        # Maybe a relocation table could be implemented, and function calls
+        # across shellcodes would automatically populate it. It'd be tricky,
+        # but doable, and it'd save shellcode writers from dealing with this.
+        #
+        # I'm also not convinced with the API for this, but there must be a
+        # relocate() method anyway, because some weird shellcodes may need to
+        # do manual relocations instead of using the relocation table.
+        #
         if delta != 0:
+            self.offset += delta
             unchanged = True
             for child in self.children:
                 if not child.is_compiled():
@@ -688,7 +714,11 @@ class Shellcode (object):
                 if unchanged and bytes != child.bytes:
                     unchanged = False
             if not unchanged and self.is_compiled():
-                self.clean()
+                offset = self.offset
+                try:
+                    self.clean()
+                finally:
+                    self.offset = offset
 
     def _check_platform(self, other):
         """
