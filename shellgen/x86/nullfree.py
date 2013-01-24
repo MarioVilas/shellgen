@@ -168,15 +168,19 @@ class NullFreeEncoder (Encoder):
                     # Calculate a XOR key.
                     key = self.find_key(child_bytes, key_size)
 
+                    # Calculate a terminator token.
+                    terminator = self.find_terminator(child_bytes)
+
                     # Compile the decoder stub.
-                    decoder, key_deltas = self.get_decoder(key)
+                    decoder, key_deltas, term_delta = self.get_decoder(key,
+                                                                    terminator)
 
                     # Relocate the child.
                     delta = len(prefix) + len(decoder) - delta
                     if delta:
                         child.relocate(delta)
 
-                        # Align the relocated child shellcode size to 32 bits.
+                        # Align the relocated child shellcode size.
                         relocated_child_bytes = self.align(
                                                         relocated_child_bytes,
                                                         key_size)
@@ -185,17 +189,22 @@ class NullFreeEncoder (Encoder):
                         relocated_child_bytes = child.bytes
                         if relocated_child_bytes != child_bytes:
 
+                            # Use the relocated child bytes.
+                            child_bytes = relocated_child_bytes
+
                             # Remember the child is position dependent.
                             self._position_dependent = True
 
                             # Recalculate the XOR key.
                             key = self.find_key(child_bytes, key_size)
 
-                            # Patch the decoder stub.
-                            decoder = patch_decoder(decoder, key_deltas, key)
+                            # Recalculate the terminator token.
+                            terminator = self.find_terminator(child_bytes)
 
-                            # Use the relocated child bytes.
-                            child_bytes = relocated_child_bytes
+                            # Patch the decoder stub.
+                            decoder = patch_decoder(decoder,
+                                                    key_deltas, key,
+                                                    term_delta, terminator)
 
                     # We've done it! Break out of the loop.
                     break
@@ -219,7 +228,10 @@ class NullFreeEncoder (Encoder):
             child_bytes = self.encode(child_bytes, key)
 
         # Return the decoder stub + the encoded bytes.
-        return prefix + decoder + child_bytes
+        bytes = prefix + decoder + child_bytes
+        if "\x00" in bytes:
+            raise EncodingError("Internal error!")
+        return bytes
 
     @staticmethod
     def get_decoder_8(key, terminator):
@@ -316,7 +328,8 @@ class NullFreeEncoder (Encoder):
         Find a suitable n-byte XOR key for the given bytecode.
 
         @type  bytes: str
-        @param bytes: Bytecode to encode. Its size must be aligned to n bytes.
+        @param bytes: Bytecode to encode.
+            Must be at least C{key_size} bytes long.
 
         @type  key_size: int
         @param key_size: Size of the key, in bytes.
@@ -328,19 +341,21 @@ class NullFreeEncoder (Encoder):
         # Precalculate the range of possible keysize-relative positions.
         key_range = range(key_size)
 
-        # Find the keysize-relative position of all characters.
+        # Find the keysize-relative position of all characters,
+        # except for the null character.
         position = tuple([set() for _ in key_range])
         for index in xrange(len(bytes)):
             char = bytes[index]
-            position[index & 3].add(char)
+            if char != "\x00":
+                position[index % key_size].add(char)
 
         # For each keysize-relative position find the characters that are NOT
         # there, from those pick any character, and combine it into the key.
         # If there are no candidates for this position, then there's no valid
         # key for this size.
-        key = ""
-        all = set(key_range)
         randint = random.randint
+        key = ""
+        all = set( struct.pack("B" * 255, *xrange(1, 255)) )
         for index in key_range:
             candidates = position[index]
             candidates.difference_update(all)
@@ -352,22 +367,76 @@ class NullFreeEncoder (Encoder):
         return key
 
     @staticmethod
-    def get_decoder(key):
+    def find_terminator(bytes):
+        """
+        Find a suitable terminator token.
+
+        @type  bytes: str
+        @param bytes: Bytecode to encode.
+
+        @rtype:  str
+        @return: DWORD terminator token, packed as a string.
+        """
+
+        # Just find any random DWORD that's not present in the bytecode,
+        # avoiding null characters so we can use it verbatim in the stub.
+        # The only way this can fail is with a >16Gb string containing
+        # all possible combinations, so I'm pretty confident we'll never
+        # actually come across that corner case in real life. :)
+        randint = random.randint
+        pack    = struct.pack
+        while True:
+            terminator = pack("BBBB", *(randint(1,255), randint(1,255),
+                                        randint(1,255), randint(1,255)))
+            if terminator not in bytes:
+                return terminator
+
+    @staticmethod
+    def get_decoder(key, terminator):
         """
         Get the decoder stub bytecode for the variable size XOR algorithm.
 
         @type  key: str
-        @param key: XOR key.
+        @param key: XOR key. Must be aligned to DWORD.
 
-        @rtype:  str
-        @return: Decoder stub bytecode.
+        @type  terminator: str
+        @param terminator: Terminator token. Must be a DWORD.
+
+        @rtype:  tuple(str, list(int), int)
+        @return: Tuple containing the decoder stub bytecode, the list of
+            delta offsets to patch if the XOR key needs to be replaced,
+            and the delta offset to patch if the terminator token needs to
+            be replaced.
+
+        @raise ValueError: The key size is not aligned to DWORD,
+            or the terminator token is not a DWORD.
         """
+        if len(key) & 3:
+            msg = "Key size must be aligned to 4 bytes, got %d"
+            raise ValueError(msg % len(key))
+        if len(terminator) != 4:
+            msg = "Terminator token must be 4 bytes in size, got %d"
+            raise ValueError(msg % len(terminator))
 
-        #
-        # XXX TODO
-        #
+        # decoder: add esi, byte payload
+        #          mov edi, esi
+        # decrypt: lodsd
+        #          xor eax, 0xBAADF00D ; XOR key
+        #          ; insert more XORs here, patch the ADD ESI above
+        #          stosd
+        #          cmp eax, 0xDEADBEEF ; terminator
+        #          jnz decrypt
+        # payload: ; encoded bytes go here
 
-        raise NotImplementedError()
+        pack = struct.pack
+        decoder = "\x83\xC6" + pack("B", 14 + (len(key) >> 2)) + "\x89\xF7\xAD"
+        key_deltas = []
+        for i in xrange(0, len(key), 4):
+            key_deltas.append(len(decoder) + 1)
+            decoder += "\x35" + key[i:i+4]
+        decoder += ("\xAB\x3D" + terminator +
+                    "\x75" + pack("b", -9 - (len(key) >> 2)))
+        return decoder, key_deltas, len(decoder) - 6
 
     @staticmethod
     def encode(bytes, key):
@@ -393,6 +462,37 @@ class NullFreeEncoder (Encoder):
         pad = key * pad_size
         bytes = [ bytes[i] ^ pad[i] for i in xrange(len(bytes)) ]
         return struct.pack(fmt, *bytes)
+
+    @staticmethod
+    def patch_decoder(decoder, key_deltas, key, terminator_delta, terminator):
+        """
+        Patch the decoder stub to change the XOR key.
+
+        @type  decoder: str
+        @param decoder: Decoder stub bytecode to be patched.
+
+        @type  key_deltas: list(int)
+        @param key_deltas:
+            List of delta offsets to patch to replace the XOR key.
+
+        @type  key: str
+        @param key: XOR key.
+
+        @type  terminator_delta: int
+        @param terminator_delta:
+            Delta offset to patch to replace the terminator token.
+
+        @type  terminator: str
+        @param terminator: Terminator token.
+
+        @rtype:  str
+        @return: Patched decoded stub that uses the new key and token.
+        """
+        for delta in key_deltas:
+            decoder = decoder[:delta] + key + decoder[delta+len(key):]
+        decoder = decoder[:terminator_delta] + terminator + \
+                  decoder[terminator_delta+len(terminator):]
+        return decoder
 
 #-----------------------------------------------------------------------------#
 
