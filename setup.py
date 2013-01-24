@@ -82,14 +82,6 @@ class TestCommand(Command):
         pass
 
     def run(self):
-        try:
-            self.__test()
-        except Exception:
-            import traceback
-            traceback.print_exc()
-            raise
-
-    def __test(self):
         import sys
         sys.path.insert(0, dirname(__file__))
         print "testing shellgen.base"
