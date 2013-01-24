@@ -41,13 +41,14 @@ class NullFreeEncoder (Encoder):
 
     # Bytecode for the 8-bit XOR decoder stub (13 bytes).
     __decoder_stub_8 = (
-        "\x83\xC6\x0D"  #             add esi, 13
-        "\x89\xF7"      #             mov edi, esi
-        "\xAC"          # decrypt:    lodsb
-        "\x34\xFF"      #             xor al, 255       ; key
-        "\xAA"          #             stosb
-        "\x3C\xFE"      #             cmp al, 254       ; terminator
-        "\x75\xFA"      #             jnz decrypt
+        "\x83\xC6\x0D"  # decoder: add esi, byte payload
+        "\x89\xF7"      #          mov edi, esi
+        "\xAC"          # decrypt: lodsb
+        "\x34\xFF"      #          xor al, 255       ; key
+        "\xAA"          #          stosb
+        "\x3C\xFE"      #          cmp al, 254       ; terminator
+        "\x75\xF8"      #          jnz decrypt
+                        # payload: ; encoded bytes go here
     )
 
     # Delta offset where to patch the 8-bit XOR decoder stub to set the key.
@@ -233,8 +234,8 @@ class NullFreeEncoder (Encoder):
             raise EncodingError("Internal error!")
         return bytes
 
-    @staticmethod
-    def get_decoder_8(key, terminator):
+    @classmethod
+    def get_decoder_8(cls, key, terminator):
         """
         Get the decoder stub bytecode for the 8-bit XOR algorithm.
 
@@ -247,9 +248,9 @@ class NullFreeEncoder (Encoder):
         @rtype:  str
         @return: Decoder stub bytecode.
         """
-        delta_key = self.__decoder_stub_delta_key_8
-        delta_term = self.__decoder_stub_delta_terminator_8
-        decoder = self.__decoder_stub_8
+        delta_key = cls.__decoder_stub_delta_key_8
+        delta_term = cls.__decoder_stub_delta_terminator_8
+        decoder = cls.__decoder_stub_8
         decoder = decoder[:delta_key]  + key        + decoder[ delta_key+1:]
         decoder = decoder[:delta_term] + terminator + decoder[delta_term+1:]
         return decoder
@@ -268,7 +269,7 @@ class NullFreeEncoder (Encoder):
 
         # Pick any character that's not present in the shellcode.
         used_chars = set(bytes)
-        free_chars = set( struct.pack("B" * 255, *xrange(1, 255)) )
+        free_chars = set( struct.pack("B" * 254, *range(1, 255)) )
         free_chars.difference_update(used_chars)
         if len(free_chars) < 2:
             raise EncodingError()
@@ -295,7 +296,7 @@ class NullFreeEncoder (Encoder):
         @rtype:  str
         @return: Encoded bytecode.
         """
-        bytes = bytes + terminator
+        bytes += terminator
         fmt = "B" * len(bytes)
         unpack = struct.unpack
         pad = unpack("B", key) * len(bytes)
@@ -410,6 +411,7 @@ class NullFreeEncoder (Encoder):
 
         @raise ValueError: The key size is not aligned to DWORD,
             or the terminator token is not a DWORD.
+        @raise EncodingError: The decoder stub could not be compiled.
         """
         if len(key) & 3:
             msg = "Key size must be aligned to 4 bytes, got %d"
@@ -428,18 +430,23 @@ class NullFreeEncoder (Encoder):
         #          jnz decrypt
         # payload: ; encoded bytes go here
 
-        pack = struct.pack
-        decoder = "\x83\xC6" + pack("B", 14 + (len(key) >> 2)) + "\x89\xF7\xAD"
-        key_deltas = []
-        for i in xrange(0, len(key), 4):
-            key_deltas.append(len(decoder) + 1)
-            decoder += "\x35" + key[i:i+4]
-        decoder += ("\xAB\x3D" + terminator +
-                    "\x75" + pack("b", -9 - (len(key) >> 2)))
-        return decoder, key_deltas, len(decoder) - 6
+        try:
+            pack = struct.pack
+            decoder = ("\x83\xC6" + pack("B", 14 + (len(key) >> 2)) +
+                       "\x89\xF7"
+                       "\xAD")
+            key_deltas = []
+            for i in xrange(0, len(key), 4):
+                key_deltas.append(len(decoder) + 1)
+                decoder += "\x35" + key[i:i+4]
+            decoder += ("\xAB\x3D" + terminator +
+                        "\x75" + pack("b", -9 - (len(key) >> 2)))
+            return decoder, key_deltas, len(decoder) - 6
+        except struct.error:
+            raise EncodingError("The decoder stub could not be compiled.")
 
     @staticmethod
-    def encode(bytes, key):
+    def encode(bytes, key, terminator):
         """
         Encode the bytecode with the given variable size XOR key.
 
@@ -449,9 +456,13 @@ class NullFreeEncoder (Encoder):
         @type  key: str
         @param key: XOR key.
 
+        @type  terminator: str
+        @param terminator: Terminator token. Must be a DWORD.
+
         @rtype:  str
         @return: Encoded bytecode.
         """
+        bytes += terminator
         unpack = struct.unpack
         fmt = "B" * len(bytes)
         bytes = unpack(fmt, bytes)
@@ -498,4 +509,46 @@ class NullFreeEncoder (Encoder):
 
 # Unit test.
 def test():
-    raise NotImplementedError()
+    from ..base import CompilerState
+
+    # A different implementation of XOR.
+    def xor(bytes, key):
+        return "".join([chr(ord(bytes[i])^ord(key[i%len(key)]))
+                        for i in xrange(len(bytes))])
+
+    # Test the 8-bit algorithm.
+    bytes = "\x00" * 500
+    key, terminator = NullFreeEncoder.find_key_8(bytes)
+    assert "\x00" not in key
+    assert "\x00" not in terminator
+    encoded = NullFreeEncoder.encode_8(bytes, key, terminator)
+    assert "\x00" not in encoded
+    stub = NullFreeEncoder.get_decoder_8(key, terminator)
+    assert "\x00" not in stub
+    assert xor(encoded, key) == bytes + terminator
+    shellcode = NullFreeEncoder(bytes)
+    state = CompilerState()
+    state.previous["pc"] = "esi"
+    shellcode.compile(state)
+    ##with open("nullfree.bin", "wb") as fd: fd.write(shellcode.bytes)
+    ##with open("nullfree2.bin", "wb") as fd: fd.write(stub + encoded)
+    key = shellcode.bytes[-2]
+    terminator = chr( ord(shellcode.bytes[-1]) ^ ord(key) )
+    encoded = NullFreeEncoder.encode_8(bytes, key, terminator)
+    stub = NullFreeEncoder.get_decoder_8(key, terminator)
+    assert shellcode.bytes == stub + encoded
+
+    # Test the insertion of GetPC.
+    shellcode = NullFreeEncoder(bytes)
+    state = CompilerState()
+    state.previous["pc"] = "esi"
+    shellcode.compile(state)
+    no_getpc = shellcode.bytes
+    state = CompilerState()
+    state.previous["pc"] = "eax"
+    shellcode.compile(state)
+    getpc_from_eax = shellcode.bytes
+    shellcode.compile()
+    getpc_normal = shellcode.bytes
+    assert len(getpc_from_eax) == len(no_getpc) + 2
+    assert len(getpc_normal) == len(no_getpc) + GetPC.length
