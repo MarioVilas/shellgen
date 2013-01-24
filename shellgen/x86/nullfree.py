@@ -39,23 +39,21 @@ class NullFreeEncoder (Encoder):
     encoding  = "nullfree"
     qualities = "stack_balanced"
 
-    # Bytecode for the 8-bit XOR decoder stub (13 bytes).
+    # Bytecode for the 8-bit XOR decoder stub (12 bytes).
     __decoder_stub_8 = (
-        "\x83\xC6\x0D"  # decoder: add esi, byte payload
-        "\x89\xF7"      #          mov edi, esi
-        "\xAC"          # decrypt: lodsb
-        "\x34\xFF"      #          xor al, 255       ; key
-        "\xAA"          #          stosb
-        "\x3C\xFE"      #          cmp al, 254       ; terminator
-        "\x75\xF8"      #          jnz decrypt
+        "\x83\xC6\x0B"  # decoder: add esi, byte payload - 1
+        "\x46"          # decrypt: inc esi
+        "\x80\x36\xFF"  #          xor byte [esi], 255  ; key
+        "\x80\x3e\xFE"  #          cmp byte [esi], 254  ; terminator
+        "\x75\xF7"      #          jnz decrypt
                         # payload: ; encoded bytes go here
     )
 
     # Delta offset where to patch the 8-bit XOR decoder stub to set the key.
-    __decoder_stub_delta_key_8 = 7
+    __decoder_stub_delta_key_8 = 6
 
     # Delta where to patch the 8-bit XOR decoder stub to set the terminator.
-    __decoder_stub_delta_terminator_8 = 10
+    __decoder_stub_delta_terminator_8 = 9
 
     def __init__(self, child):
         super(NullFreeEncoder, self).__init__(child)
@@ -137,17 +135,17 @@ class NullFreeEncoder (Encoder):
             relocated_child_bytes = child.bytes
             if relocated_child_bytes != child_bytes:
 
+                # Use the relocated child bytes.
+                child_bytes = relocated_child_bytes
+
                 # Remember the child is position dependent.
                 self._position_dependent = True
 
                 # Recalculate the XOR key.
-                key, terminator = self.find_key_8(relocated_child_bytes)
+                key, terminator = self.find_key_8(child_bytes)
 
-                # Patch the decoder stub.
+                # Recompile the decoder stub.
                 decoder = self.get_decoder_8(key, terminator)
-
-                # Use the relocated child bytes.
-                child_bytes = relocated_child_bytes
 
             # XOR-encode the bytes.
             child_bytes = self.encode_8(child_bytes, key, terminator)
@@ -180,6 +178,7 @@ class NullFreeEncoder (Encoder):
                     delta = len(prefix) + len(decoder) - delta
                     if delta:
                         child.relocate(delta)
+                        relocated_child_bytes = child.bytes
 
                         # Align the relocated child shellcode size.
                         relocated_child_bytes = self.align(
@@ -187,7 +186,6 @@ class NullFreeEncoder (Encoder):
                                                         key_size)
 
                         # Did the child change due to relocation?
-                        relocated_child_bytes = child.bytes
                         if relocated_child_bytes != child_bytes:
 
                             # Use the relocated child bytes.
@@ -226,7 +224,7 @@ class NullFreeEncoder (Encoder):
                         raise
 
             # XOR-encode the bytes.
-            child_bytes = self.encode(child_bytes, key)
+            child_bytes = self.encode(child_bytes, key, terminator)
 
         # Return the decoder stub + the encoded bytes.
         bytes = prefix + decoder + child_bytes
@@ -356,10 +354,10 @@ class NullFreeEncoder (Encoder):
         # key for this size.
         randint = random.randint
         key = ""
-        all = set( struct.pack("B" * 255, *xrange(1, 255)) )
+        all = set( struct.pack("B" * 254, *xrange(1, 255)) )
         for index in key_range:
             candidates = position[index]
-            candidates.difference_update(all)
+            candidates.symmetric_difference_update(all)
             if not candidates:
                 raise EncodingError()
             key += tuple(candidates)[ randint(0, len(candidates)) ]
@@ -432,7 +430,7 @@ class NullFreeEncoder (Encoder):
 
         try:
             pack = struct.pack
-            decoder = ("\x83\xC6" + pack("B", 14 + (len(key) >> 2)) +
+            decoder = ("\x83\xC6" + pack("B", 18 + (len(key) >> 2)) +
                        "\x89\xF7"
                        "\xAD")
             key_deltas = []
@@ -440,7 +438,7 @@ class NullFreeEncoder (Encoder):
                 key_deltas.append(len(decoder) + 1)
                 decoder += "\x35" + key[i:i+4]
             decoder += ("\xAB\x3D" + terminator +
-                        "\x75" + pack("b", -9 - (len(key) >> 2)))
+                        "\x75" + pack("b", -13 - (len(key) >> 2)))
             return decoder, key_deltas, len(decoder) - 6
         except struct.error:
             raise EncodingError("The decoder stub could not be compiled.")
@@ -552,3 +550,40 @@ def test():
     getpc_normal = shellcode.bytes
     assert len(getpc_from_eax) == len(no_getpc) + 2
     assert len(getpc_normal) == len(no_getpc) + GetPC.length
+
+    # Test the corner case for the 8-bit algorithm.
+    bytes = "".join([chr(x) for x in xrange(256)])
+    try:
+        NullFreeEncoder.find_key_8(bytes)
+        assert False
+    except EncodingError:
+        pass
+
+    # Test the 32-bit alignment.
+    assert NullFreeEncoder.align("hola manola!", 4) == "hola manola!"
+    assert NullFreeEncoder.align("hola manola", 4) == "hola manola\x90"
+    assert NullFreeEncoder.align("holamanola", 4) == "holamanola\x90\x90"
+    assert NullFreeEncoder.align("holamanol", 4) == "holamanol\x90\x90\x90"
+
+    # Test the 32-bit algorithm.
+    key = NullFreeEncoder.find_key(bytes, 4)
+    assert "\x00" not in key
+    terminator = NullFreeEncoder.find_terminator(bytes)
+    assert "\x00" not in terminator
+    encoded = NullFreeEncoder.encode(bytes, key, terminator)
+    assert "\x00" not in encoded
+    stub, key_deltas, term_delta = NullFreeEncoder.get_decoder(key, terminator)
+    assert "\x00" not in stub
+    assert xor(encoded, key) == bytes + terminator
+    shellcode = NullFreeEncoder(bytes)
+    state = CompilerState()
+    state.previous["pc"] = "esi"
+    shellcode.compile(state)
+    with open("nullfree3.bin", "wb") as fd: fd.write(shellcode.bytes)
+    with open("nullfree4.bin", "wb") as fd: fd.write(stub + encoded)
+    key = shellcode.bytes[-8:-4]
+    terminator = struct.pack("<L",
+                             struct.unpack("<L", shellcode.bytes[-4:])[0] ^
+                             struct.unpack("<L", key)[0] )
+    encoded = NullFreeEncoder.encode(bytes, key, terminator)
+    stub = NullFreeEncoder.get_decoder(key, terminator)
