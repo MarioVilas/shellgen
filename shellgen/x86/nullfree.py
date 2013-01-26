@@ -22,7 +22,7 @@
 # MA 02110-1301, USA.
 
 from __future__ import absolute_import
-from ..base import Encoder, EncodingError
+from ..base import Encoder, EncodingError, CompileError
 from ..util import bit_length, compile_child
 from .getpc import GetPC
 
@@ -115,6 +115,7 @@ class NullFreeEncoder (Encoder):
             prefix += push[pc] + "\x5E" # push reg32 / pop esi
 
         # Try encoding with an 8-bit XOR key first.
+        # TODO: we could predict if this will fail instead of trying.
         delta = 0
         try:
 
@@ -152,6 +153,7 @@ class NullFreeEncoder (Encoder):
             child_bytes = self.encode_8(child_bytes, key, terminator)
 
         # If we can't, try again with a variable size XOR key.
+        # TODO: Maybe there's a way to predict how long the key needs to be?
         except EncodingError:
 
             # Remember we failed with 8 bits so we don't try next time.
@@ -165,11 +167,8 @@ class NullFreeEncoder (Encoder):
                     # Align the child shellcode size.
                     child_bytes = self.align(child_bytes, key_size)
 
-                    # Calculate a XOR key.
-                    key = self.find_key(child_bytes, key_size)
-
-                    # Calculate a terminator token.
-                    terminator = self.find_terminator(child_bytes)
+                    # Calculate a XOR key and a terminator token.
+                    key, terminator = self.find_key(child_bytes, key_size)
 
                     # Compile the decoder stub.
                     decoder, key_deltas, term_delta = self.get_decoder(key,
@@ -195,22 +194,19 @@ class NullFreeEncoder (Encoder):
                             # Remember the child is position dependent.
                             self._position_dependent = True
 
-                            # Recalculate the XOR key.
-                            key = self.find_key(child_bytes, key_size)
-
-                            # Recalculate the terminator token.
-                            terminator = self.find_terminator(child_bytes)
+                            # Recalculate the XOR key and terminator token.
+                            key, terminator = self.find_key(child_bytes,
+                                                            key_size)
 
                             # Patch the decoder stub.
-                            decoder = patch_decoder(decoder,
-                                                    key_deltas, key,
-                                                    term_delta, terminator)
+                            decoder = self.patch_decoder(decoder,
+                                    key_deltas, key, term_delta, terminator)
 
                     # We've done it! Break out of the loop.
                     break
 
                 # We failed, there's no valid key for this size.
-                except EncodingError:
+                except EncodingError, e:
 
                     # Try again with a bigger key. Keys must be aligned
                     # to DWORD because the decoder stub requires it so.
@@ -226,7 +222,22 @@ class NullFreeEncoder (Encoder):
         # Return the decoder stub + the encoded bytes.
         bytes = prefix + decoder + child_bytes
         if "\x00" in bytes:
-            raise EncodingError("Internal error!")
+            raise AssertionError((
+                "Internal error!\n"
+                "  Class:   %s\n"
+                "  Key:     %s\n"
+                "  Token:   %s\n"
+                "  Prefix:  %s\n"
+                "  Decoder: %s\n"
+                "  Payload: %s\n"
+            ) % (
+                self.__class__.__name__,
+                key.encode("hex"),
+                terminator.encode("hex"),
+                prefix.encode("hex"),
+                decoder.encode("hex"),
+                child_bytes.encode("hex"),
+            ))
         return bytes
 
     @classmethod
@@ -318,10 +329,11 @@ class NullFreeEncoder (Encoder):
             bytes += "\x90" * (key_size - tail)
         return bytes
 
-    @staticmethod
-    def find_key(bytes, key_size):
+    @classmethod
+    def find_key(cls, bytes, key_size):
         """
-        Find a suitable n-byte XOR key for the given bytecode.
+        Find a suitable n-byte XOR key and terminator token
+        for the given bytecode.
 
         @type  bytes: str
         @param bytes: Bytecode to encode.
@@ -330,9 +342,14 @@ class NullFreeEncoder (Encoder):
         @type  key_size: int
         @param key_size: Size of the key, in bytes.
 
-        @rtype:  str
-        @return: n-byte XOR key, packed as a string.
+        @rtype:  tuple(str, str)
+        @return: n-byte XOR key and terminator token, packed as two strings.
+
+        @raise EncodingError: No valid key found for this size.
         """
+        randint   = random.randint
+        pack      = struct.pack
+        unpack    = struct.unpack
 
         # Precalculate the range of possible keysize-relative positions.
         key_range = range(key_size)
@@ -344,58 +361,51 @@ class NullFreeEncoder (Encoder):
             char = bytes[index]
             if char != "\x00":
                 position[index % key_size].add(char)
+        for index in key_range:
+            if not position[index]:
+                raise EncodingError(
+                    "No valid %d-byte XOR key could be found." % key_size)
+
+        # If we're lucky, we may use four nulls as the terminator. This allows
+        # an optimization in the decoder stub. If that fails, any use four
+        # characters we already have in those positions.
+        spliced = [ bytes[i:i+4] for i in xrange(0, len(bytes), 4) ]
+        terminator = "\0\0\0\0"
+        if terminator in spliced:
+            if (len(position[0]) == 1 and
+                len(position[1]) == 1 and
+                len(position[2]) == 1 and
+                len(position[3]) == 1):     # infinite loop!
+                    raise EncodingError(
+                        "No valid %d-byte XOR key could be found." % key_size)
+            while True:
+                terminator = (
+                    list(position[0])[randint(0,len(position[0])-1)] +
+                    list(position[1])[randint(0,len(position[1])-1)] +
+                    list(position[2])[randint(0,len(position[2])-1)] +
+                    list(position[3])[randint(0,len(position[3])-1)]
+                )
+                if terminator not in spliced:
+                    break
 
         # For each keysize-relative position find the characters that are NOT
         # there, from those pick any character, and combine it into the key.
         # If there are no candidates for this position, then there's no valid
         # key for this size.
-        randint = random.randint
         key = ""
-        all = set( struct.pack("B" * 254, *xrange(1, 255)) )
+        good_chars = set( pack("B" * 255, *xrange(1, 256)) )
         for index in key_range:
-            candidates = position[index]
-            candidates.symmetric_difference_update(all)
+            candidates = good_chars.difference( position[index] )
             if not candidates:
-                raise EncodingError()
+                raise EncodingError(
+                    "No valid %d-byte XOR key could be found." % key_size)
             key += tuple(candidates)[ randint(0, len(candidates) - 1) ]
 
-        # Return the key.
-        return key
+        # Return the key and terminator.
+        return key, terminator
 
-    @staticmethod
-    def find_terminator(bytes):
-        """
-        Find a suitable terminator token.
-
-        @type  bytes: str
-        @param bytes: Bytecode to encode.
-
-        @rtype:  str
-        @return: DWORD terminator token, packed as a string.
-        """
-
-        # If we're lucky, we may use four nulls as the terminator.
-        # This allows an optimization in the decoder stub.
-        # For that we must make sure we don't have four aligned nulls in the
-        # bytecode, because that would terminate the decoding loop prematurely.
-        if "\0\0\0\0" not in ( bytes[i:i+4] for i in xrange(len(bytes)) ):
-            return "\0\0\0\0"
-
-        # Just find any random DWORD that's not present in the bytecode,
-        # avoiding null characters so we can use it verbatim in the stub.
-        # The only way this can fail is with a >16Gb string containing
-        # all possible combinations, so I'm pretty confident we'll never
-        # actually come across that corner case in real life. :)
-        randint = random.randint
-        pack    = struct.pack
-        while True:
-            terminator = pack("BBBB", *(randint(1,255), randint(1,255),
-                                        randint(1,255), randint(1,255)))
-            if terminator not in bytes:
-                return terminator
-
-    @staticmethod
-    def get_decoder(key, terminator):
+    @classmethod
+    def get_decoder(cls, key, terminator):
         """
         Get the decoder stub bytecode for the variable size XOR algorithm.
 
@@ -413,7 +423,7 @@ class NullFreeEncoder (Encoder):
 
         @raise ValueError: The key size is not aligned to DWORD,
             or the terminator token is not a DWORD.
-        @raise EncodingError: The decoder stub could not be compiled.
+        @raise CompileError: The decoder stub could not be compiled.
         """
         if len(key) & 3:
             msg = "Key size must be aligned to 4 bytes, got %d"
@@ -435,16 +445,14 @@ class NullFreeEncoder (Encoder):
                 # payload: ; encoded bytes go here
 
                 pack = struct.pack
-                decoder = ("\x83\xC6" + pack("B", 13 + (len(key) >> 2)) +
-                           "\x89\xF7"
-                           "\xAD")
+                var_size = ((len(key) >> 2) * 7)
+                decoder = ["\x83\xC6" + pack("B", 7 + var_size) + "\x89\xF7"]
                 key_deltas = []
                 for i in xrange(0, len(key), 4):
-                    key_deltas.append(len(decoder) + 1)
-                    decoder += "\x35" + key[i:i+4]
-                decoder += ("\xAB"
-                            "\x75" + pack("b", -8 - (len(key) >> 2)))
-                return decoder, key_deltas, None
+                    key_deltas.append(7 + (i * 7))
+                    decoder.append("\xAD\x35" + key[i:i+4] + "\xAB")
+                decoder.append("\x75" + pack("b", -2 - var_size))
+                return "".join(decoder), key_deltas, None
 
             else:
 
@@ -460,22 +468,21 @@ class NullFreeEncoder (Encoder):
                 # payload: ; encoded bytes go here
 
                 pack = struct.pack
-                decoder = ("\x83\xC6" + pack("B", 18 + (len(key) >> 2)) +
-                           "\x89\xF7"
-                           "\xAD")
+                var_size = (len(key) >> 2) * 7
+                decoder = ["\x83\xC6" + pack("B", 12 + var_size) + "\x89\xF7"]
                 key_deltas = []
                 for i in xrange(0, len(key), 4):
-                    key_deltas.append(len(decoder) + 1)
-                    decoder += "\x35" + key[i:i+4]
-                decoder += ("\xAB\x3D" + terminator +
-                            "\x75" + pack("b", -13 - (len(key) >> 2)))
-                return decoder, key_deltas, len(decoder) - 6
+                    key_deltas.append(7 + (i * 7))
+                    decoder.append("\xAD\x35" + key[i:i+4] + "\xAB")
+                decoder.append("\x3D" + terminator +
+                               "\x75" + pack("b", -7 - var_size))
+                return "".join(decoder), key_deltas, var_size + 6
 
         except struct.error:
-            raise EncodingError("The decoder stub could not be compiled.")
+            raise CompileError("The decoder stub could not be compiled.", cls)
 
-    @staticmethod
-    def encode(bytes, key, terminator):
+    @classmethod
+    def encode(cls, bytes, key, terminator):
         """
         Encode the bytecode with the given variable size XOR key.
 
@@ -501,7 +508,21 @@ class NullFreeEncoder (Encoder):
             pad_size += 1
         pad = key * pad_size
         bytes = [ bytes[i] ^ pad[i] for i in xrange(len(bytes)) ]
-        return struct.pack(fmt, *bytes)
+        encoded = struct.pack(fmt, *bytes)
+        if "\x00" in encoded:
+            raise AssertionError((
+                "Internal error!\n"
+                "  Class  : %s\n"
+                "  Key:     %s\n"
+                "  Token:   %s\n"
+                "  Encoded: %s\n"
+            ) % (
+                cls.__name__,
+                struct.pack("B" * len(key), *key).encode("hex"),
+                terminator.encode("hex"),
+                " ".join([c.encode("hex") for c in encoded])
+            ))
+        return encoded
 
     @staticmethod
     def patch_decoder(decoder, key_deltas, key, terminator_delta, terminator):
@@ -585,7 +606,7 @@ def test():
     stub = NullFreeEncoder.get_decoder_8(key, terminator)
     assert shellcode.bytes == stub + encoded
 
-    # Test the insertion of GetPC.
+    # Test the insertion of GetPC when using the 8-bit algorithm.
     shellcode = NullFreeEncoder(bytes)
     state = CompilerState()
     state.previous["pc"] = "esi"
@@ -615,57 +636,124 @@ def test():
     assert NullFreeEncoder.align("holamanol", 4) == "holamanol\x90\x90\x90"
 
     # Test the 32-bit algorithm, short decoder stub.
-    key = NullFreeEncoder.find_key(bytes, 4)
+    bytes = "".join([chr(x) for x in xrange(256)])
+    key, terminator = NullFreeEncoder.find_key(bytes, 4)
     assert "\x00" not in key
-    terminator = NullFreeEncoder.find_terminator(bytes)
     assert "\x00\x00\x00\x00" not in bytes
     assert terminator == "\x00\x00\x00\x00"
     encoded = NullFreeEncoder.encode(bytes, key, terminator)
     assert "\x00" not in encoded
     assert encoded == NullFreeEncoder.align(encoded, 4)
-    assert len(encoded) & 3
+    assert (len(encoded) & 3) == 0
     stub, key_deltas, term_delta = NullFreeEncoder.get_decoder(key, terminator)
+    assert term_delta is None
     assert "\x00" not in stub
     assert xor(encoded, key) == bytes + terminator
     shellcode = NullFreeEncoder(bytes)
     state = CompilerState()
     state.previous["pc"] = "esi"
     shellcode.compile(state)
-    with open("nullfree3.bin", "wb") as fd: fd.write(shellcode.bytes)
-    with open("nullfree4.bin", "wb") as fd: fd.write(stub + encoded)
-    key = shellcode.bytes[-8:-4]
+    ##with open("nullfree3.bin", "wb") as fd: fd.write(shellcode.bytes)
+    ##with open("nullfree4.bin", "wb") as fd: fd.write(stub + encoded)
+    assert len(key_deltas) == 1
+    key = shellcode.bytes[key_deltas[0]:key_deltas[0]+4]
     terminator = struct.pack("<L",
                              struct.unpack("<L", shellcode.bytes[-4:])[0] ^
                              struct.unpack("<L", key)[0] )
-    print shellcode.bytes[-8:].encode("hex")
-    print key.encode("hex")
-    print terminator.encode("hex")
     assert terminator == "\x00\x00\x00\x00"
     encoded = NullFreeEncoder.encode(bytes, key, terminator)
-    stub = NullFreeEncoder.get_decoder(key, terminator)
+    stub, key_deltas, term_delta = NullFreeEncoder.get_decoder(key, terminator)
+    assert shellcode.bytes == stub + encoded
 
     # Test the 32-bit algorithm, long decoder stub.
-    bytes = bytes[:128] + "\x00\x00\x00\x00" + bytes[128:]
-    key = NullFreeEncoder.find_key(bytes, 4)
+    bytes = "".join([chr(x) for x in xrange(256)])
+    bytes += "\x00\x00\x00\x00"
+    key, terminator = NullFreeEncoder.find_key(bytes, 4)
     assert "\x00" not in key
-    terminator = NullFreeEncoder.find_terminator(bytes)
     assert "\x00" not in terminator
     encoded = NullFreeEncoder.encode(bytes, key, terminator)
     assert "\x00" not in encoded
     assert encoded == NullFreeEncoder.align(encoded, 4)
-    assert len(encoded) & 3
+    assert (len(encoded) & 3) == 0
     stub, key_deltas, term_delta = NullFreeEncoder.get_decoder(key, terminator)
+    assert term_delta is not None
     assert "\x00" not in stub
     assert xor(encoded, key) == bytes + terminator
     shellcode = NullFreeEncoder(bytes)
     state = CompilerState()
     state.previous["pc"] = "esi"
     shellcode.compile(state)
-    with open("nullfree5.bin", "wb") as fd: fd.write(shellcode.bytes)
-    with open("nullfree6.bin", "wb") as fd: fd.write(stub + encoded)
+    ##with open("nullfree5.bin", "wb") as fd: fd.write(shellcode.bytes)
+    ##with open("nullfree6.bin", "wb") as fd: fd.write(stub + encoded)
     key = shellcode.bytes[-8:-4]
     terminator = struct.pack("<L",
                              struct.unpack("<L", shellcode.bytes[-4:])[0] ^
                              struct.unpack("<L", key)[0] )
     encoded = NullFreeEncoder.encode(bytes, key, terminator)
-    stub = NullFreeEncoder.get_decoder(key, terminator)
+    stub, key_deltas, term_delta = NullFreeEncoder.get_decoder(key, terminator)
+    assert shellcode.bytes == stub + encoded
+
+    # Test the 32-bit algorithm for impossible cases.
+    bytes = "".join(["\x00" + (chr(x) * 3) for x in xrange(256)])
+    try:
+        key, terminator = NullFreeEncoder.find_key(bytes, 4)
+        assert False
+    except EncodingError:
+        pass
+    bytes = "".join([chr(x) * 4 for x in xrange(256)])
+    try:
+        key, terminator = NullFreeEncoder.find_key(bytes, 4)
+        assert False
+    except EncodingError:
+        pass
+
+    # Test the insertion of GetPC with the 32-bit algorithm, short decoder.
+    bytes = "".join([chr(x) for x in xrange(256)])
+    shellcode = NullFreeEncoder(bytes)
+    state = CompilerState()
+    state.previous["pc"] = "esi"
+    shellcode.compile(state)
+    no_getpc = shellcode.bytes
+    state = CompilerState()
+    state.previous["pc"] = "eax"
+    shellcode.compile(state)
+    getpc_from_eax = shellcode.bytes
+    shellcode.compile()
+    getpc_normal = shellcode.bytes
+    assert len(getpc_from_eax) == len(no_getpc) + 2
+    assert len(getpc_normal) == len(no_getpc) + GetPC.length
+
+    # Test the insertion of GetPC with the 32-bit algorithm, long decoder.
+    bytes = "".join([chr(x) for x in xrange(256)])
+    bytes += "\x00\x00\x00\x00"
+    shellcode = NullFreeEncoder(bytes)
+    state = CompilerState()
+    state.previous["pc"] = "esi"
+    shellcode.compile(state)
+    no_getpc = shellcode.bytes
+    state = CompilerState()
+    state.previous["pc"] = "eax"
+    shellcode.compile(state)
+    getpc_from_eax = shellcode.bytes
+    shellcode.compile()
+    getpc_normal = shellcode.bytes
+    assert len(getpc_from_eax) == len(no_getpc) + 2
+    assert len(getpc_normal) == len(no_getpc) + GetPC.length
+
+    # Test the 32-bit algorithm for longer keys.
+    bytes = "".join([(chr(x) * 64) for x in xrange(256)])
+    shellcode = NullFreeEncoder(bytes)
+    assert "\x00" not in shellcode.bytes
+    assert len(shellcode.bytes) > (len(bytes) + 4)
+    with open("nullfree7.bin", "wb") as fd: fd.write(shellcode.bytes)
+
+    # Test a corner case that can't be encoded by this algorithm.
+    # The decoder stub gets too large and fails to compile.
+    # XXX: This could be fixed but I don't see the point right now.
+    try:
+        bytes = "".join([(chr(x) * 128) for x in xrange(256)])
+        shellcode = NullFreeEncoder(bytes)
+        shellcode.bytes
+        assert False
+    except CompileError:
+        pass
