@@ -366,13 +366,24 @@ def copy_classes(all, name, namespace):
 class ShellcodeWarning (RuntimeWarning):
     "Warnings issued by this library are of this type."
 
-class CompileError (RuntimeError):
-    "An error occurred when compiling the shellcode."
+class ShellcodeError (RuntimeError):
+    "An error occurred when preparing the shellcode."
 
-    def __init__(self, message = None):
+    def __init__(self, message = None, clazz = None):
+
+        # Error message defaults to docstring for this exception class.
         if not message:
             message = self.__doc__
+
+        # If given, prepend the calling class name to the message.
+        if clazz is not None:
+            message = "%s: %s" % (clazz.__name__, message)
+
+        # Give the error message to the parent constructor.
         RuntimeError.__init__(self, message)
+
+class CompileError (ShellcodeError):
+    "An error occurred when compiling the shellcode."
 
 class EncodingError (CompileError):
     "A compile error occurred when trying to meet the encoding requirements."
