@@ -730,7 +730,7 @@ def test():
     shellcode = NullFreeEncoder(bytes)
     assert "\x00" not in shellcode.bytes
     assert len(shellcode.bytes) > (len(bytes) + 4)
-    with open("nullfree7.bin", "wb") as fd: fd.write(shellcode.bytes)
+    ##with open("nullfree7.bin", "wb") as fd: fd.write(shellcode.bytes)
 
     # Test a corner case that can't be encoded by this algorithm.
     # The decoder stub gets too large and fails to compile.
