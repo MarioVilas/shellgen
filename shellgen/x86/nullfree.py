@@ -39,22 +39,6 @@ class NullFreeEncoder (Encoder):
     encoding  = "nullfree"
     qualities = "stack_balanced"
 
-    # Bytecode for the 8-bit XOR decoder stub (12 bytes).
-    __decoder_stub_8 = (
-        "\x83\xC6\x0B"  # decoder: add esi, byte payload - 1
-        "\x46"          # decrypt: inc esi
-        "\x80\x36\xFF"  #          xor byte [esi], 255  ; key
-        "\x80\x3e\xFE"  #          cmp byte [esi], 254  ; terminator
-        "\x75\xF7"      #          jnz decrypt
-                        # payload: ; encoded bytes go here
-    )
-
-    # Delta offset where to patch the 8-bit XOR decoder stub to set the key.
-    __decoder_stub_delta_key_8 = 6
-
-    # Delta where to patch the 8-bit XOR decoder stub to set the terminator.
-    __decoder_stub_delta_terminator_8 = 9
-
     def __init__(self, child):
         super(NullFreeEncoder, self).__init__(child)
         self.__position_dependent = False
@@ -246,7 +230,7 @@ class NullFreeEncoder (Encoder):
         Get the decoder stub bytecode for the 8-bit XOR algorithm.
 
         @type  key: str
-        @param key: XOR key.
+        @param key: 8-bit XOR key.
 
         @type  terminator: str
         @param terminator: 8-bit terminator.
@@ -254,12 +238,13 @@ class NullFreeEncoder (Encoder):
         @rtype:  str
         @return: Decoder stub bytecode.
         """
-        delta_key = cls.__decoder_stub_delta_key_8
-        delta_term = cls.__decoder_stub_delta_terminator_8
-        decoder = cls.__decoder_stub_8
-        decoder = decoder[:delta_key]  + key        + decoder[ delta_key+1:]
-        decoder = decoder[:delta_term] + terminator + decoder[delta_term+1:]
-        return decoder
+        return (                  # ; 12 bytes
+        "\x83\xC6\x0B"            # decoder: add esi, byte payload - 1
+        "\x46"                    # decrypt: inc esi
+        "\x80\x36" + key +        #          xor byte [esi], 255  ; key
+        "\x80\x3E" + terminator + #          cmp byte [esi], 254  ; terminator
+        "\x75\xF7"                #          jnz decrypt
+        )                         # payload: ; encoded bytes go here
 
     @staticmethod
     def find_key_8(bytes):
