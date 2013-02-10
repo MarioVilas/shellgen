@@ -813,11 +813,11 @@ def test():
     assert "\x00" not in stub
     assert xor(encoded, key) == bytes + terminator
     shellcode = NullFreeEncoder(bytes)
+    if WRITE:
+        with open("nullfree3.bin", "wb") as fd: fd.write(shellcode.bytes)
     state = CompilerState()
     state.previous["pc"] = "esi"
     shellcode.compile(state)
-    if WRITE:
-        with open("nullfree3.bin", "wb") as fd: fd.write(shellcode.bytes)
     assert len(key_deltas) == 1
     key = shellcode.bytes[key_deltas[0]:key_deltas[0]+4]
     terminator = struct.pack("<L",
@@ -843,11 +843,11 @@ def test():
     assert "\x00" not in stub
     assert xor(encoded, key) == bytes + terminator
     shellcode = NullFreeEncoder(bytes)
+    if WRITE:
+        with open("nullfree4.bin", "wb") as fd: fd.write(shellcode.bytes)
     state = CompilerState()
     state.previous["pc"] = "esi"
     shellcode.compile(state)
-    if WRITE:
-        with open("nullfree4.bin", "wb") as fd: fd.write(shellcode.bytes)
     key = shellcode.bytes[-8:-4]
     terminator = struct.pack("<L",
                              struct.unpack("<L", shellcode.bytes[-4:])[0] ^
@@ -903,13 +903,13 @@ def test():
     assert len(getpc_normal) == len(no_getpc) + GetPC.length
 
     # Test the 32-bit algorithm for longer keys.
-    bytes = "".join([(chr(x) * 32) for x in xrange(256)])
+    bytes = "".join([(chr(x) * 12) for x in xrange(256)])
     shellcode = NullFreeEncoder(bytes)
     assert "\x00" not in shellcode.bytes
     assert len(shellcode.bytes) > (len(bytes) + 4)
     if WRITE:
         with open("nullfree5.bin", "wb") as fd: fd.write(shellcode.bytes)
-    bytes = bytes.replace("\0"*32, "\0"+("A"*31))
+    bytes = bytes.replace("\0"*12, "\0"+("A"*11))
     assert list(bytes).count('\0') == 1
     shellcode = NullFreeEncoder(bytes)
     assert "\x00" not in shellcode.bytes
