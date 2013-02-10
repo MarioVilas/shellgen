@@ -72,6 +72,9 @@ class NullFreeEncoder (Encoder):
             return child_bytes
 
         # If a PC register was not given, prepend a GetPC automatically.
+        # XXX FIXME: would be more efficient to have our own getpc here!
+        # See GetPC_Alt, the last instruction is "add esi, 5", could be
+        # merged with the "add esi" at the beginning of all our decoders.
         prefix = ""
         if not pc:
             getpc  = GetPC(pcreg = "esi")
@@ -99,7 +102,6 @@ class NullFreeEncoder (Encoder):
             prefix += push[pc] + "\x5E" # push reg32 / pop esi
 
         # Try encoding with an 8-bit XOR key first.
-        # TODO: we could predict if this will fail instead of trying.
         delta = 0
         try:
 
@@ -128,7 +130,8 @@ class NullFreeEncoder (Encoder):
                 self._position_dependent = True
 
                 # Recalculate the XOR key.
-                key, terminator = self.find_key_8(child_bytes)
+                key, terminator = self.find_key_8(child_bytes,
+                                                  terminator == "\x00")
 
                 # Recompile the decoder stub.
                 decoder = self.get_decoder_8(key, terminator)
@@ -179,8 +182,9 @@ class NullFreeEncoder (Encoder):
                             self._position_dependent = True
 
                             # Recalculate the XOR key and terminator token.
-                            key, terminator = self.find_key(child_bytes,
-                                                            key_size)
+                            key, terminator = self.find_key(
+                                child_bytes, key_size,
+                                terminator == "\x00\x00\x00\x00")
 
                             # Patch the decoder stub.
                             decoder = self.patch_decoder(decoder,
@@ -238,25 +242,61 @@ class NullFreeEncoder (Encoder):
         @rtype:  str
         @return: Decoder stub bytecode.
         """
-        return (                  # ; 12 bytes
-        "\x83\xC6\x0B"            # decoder: add esi, byte payload - 1
-        "\x46"                    # decrypt: inc esi
-        "\x80\x36" + key +        #          xor byte [esi], 255  ; key
-        "\x80\x3E" + terminator + #          cmp byte [esi], 254  ; terminator
-        "\x75\xF7"                #          jnz decrypt
-        )                         # payload: ; encoded bytes go here
+        if terminator == "\x00":
+
+            # ; 9 bytes
+            # decoder: add esi, byte payload - 1
+            # decrypt: inc esi
+            #          xor byte [esi], 255  ; key
+            #          jnz decrypt          ; terminator is null
+            # payload: ; encoded bytes go here
+
+            decoder = (
+                "\x83\xC6\x08"
+                "\x46"
+                "\x80\x36" + key +
+                "\x75\xFA"
+            )
+
+        else:
+
+            # ; 12 bytes
+            # decoder: add esi, byte payload - 1
+            # decrypt: inc esi
+            #          xor byte [esi], 255  ; key
+            #          cmp byte [esi], 254  ; terminator
+            #          jnz decrypt
+            # payload: ; encoded bytes go here
+
+            decoder = (
+                "\x83\xC6\x0B"
+                "\x46"
+                "\x80\x36" + key +
+                "\x80\x3E" + terminator +
+                "\x75\xF7"
+            )
+
+        return decoder
 
     @staticmethod
-    def find_key_8(bytes):
+    def find_key_8(bytes, force_terminator_type = None):
         """
         Find a suitable 8-bit XOR key for the given bytecode.
 
         @type  bytes: str
-        @param bytes: Bytecode to encode. Its size must be aligned to 32 bits.
+        @param bytes: Bytecode to encode.
+
+        @type  force_terminator_type: bool
+        @param force_terminator_type:
+            C{None} to pick any terminator,
+            C{True} to force the null terminator,
+            C{False} to disallow the null terminator.
 
         @rtype:  tuple(str, str)
         @return: 8-bit XOR key, and 8-bit terminator.
         """
+        if not "\x00" in bytes:
+            raise ValueError("Bytecode is already null free!")
 
         # Pick any character that's not present in the shellcode.
         used_chars = set(bytes)
@@ -266,8 +306,25 @@ class NullFreeEncoder (Encoder):
             raise EncodingError()
         candidates = list(free_chars)
         key = candidates[ random.randint(0, len(candidates) - 1) ]
-        candidates.remove(key)
-        terminator = candidates[ random.randint(0, len(candidates) - 1) ]
+
+        # If the only null byte is at the end, use it as the terminator.
+        termnull = "\x00" not in bytes[:-1]
+        if force_terminator_type is None:
+            force_terminator_type = termnull
+        if force_terminator_type:
+            if not termnull:
+                raise EncodingError()
+            terminator = "\x00"
+
+        # Otherwise, pick another character that's not in the shellcode.
+        # If we're lucky the last char isn't used anywhere else.
+        else:
+            terminator = bytes[-1]
+            if terminator == "\0" or terminator in bytes[:-1]:
+                candidates.remove(key)
+                terminator = candidates[ random.randint(0, len(candidates)-1) ]
+
+        # Return the key and terminator.
         return key, terminator
 
     @staticmethod
@@ -287,7 +344,8 @@ class NullFreeEncoder (Encoder):
         @rtype:  str
         @return: Encoded bytecode.
         """
-        bytes += terminator
+        if not bytes.endswith(terminator):
+            bytes += terminator
         fmt = "B" * len(bytes)
         unpack = struct.unpack
         pad = unpack("B", key) * len(bytes)
@@ -315,7 +373,7 @@ class NullFreeEncoder (Encoder):
         return bytes
 
     @classmethod
-    def find_key(cls, bytes, key_size):
+    def find_key(cls, bytes, key_size, force_terminator_type = None):
         """
         Find a suitable n-byte XOR key and terminator token
         for the given bytecode.
@@ -326,6 +384,12 @@ class NullFreeEncoder (Encoder):
 
         @type  key_size: int
         @param key_size: Size of the key, in bytes.
+
+        @type  force_terminator_type: bool
+        @param force_terminator_type:
+            C{None} to pick any terminator,
+            C{True} to force the null terminator,
+            C{False} to disallow the null terminator.
 
         @rtype:  tuple(str, str)
         @return: n-byte XOR key and terminator token, packed as two strings.
@@ -356,7 +420,13 @@ class NullFreeEncoder (Encoder):
         # characters we already have in those positions.
         spliced = [ bytes[i:i+4] for i in xrange(0, len(bytes), 4) ]
         terminator = "\0\0\0\0"
-        if terminator in spliced:
+        can_use_null_terminator = terminator not in spliced
+        if force_terminator_type is None:
+            force_terminator_type = can_use_null_terminator
+        if force_terminator_type:
+            if not can_use_null_terminator:
+                raise EncodingError()
+        else:
             if (len(position[0]) == 1 and
                 len(position[1]) == 1 and
                 len(position[2]) == 1 and
@@ -410,6 +480,7 @@ class NullFreeEncoder (Encoder):
             or the terminator token is not a DWORD.
         @raise CompileError: The decoder stub could not be compiled.
         """
+        pack = struct.pack
         if len(key) & 3:
             msg = "Key size must be aligned to 4 bytes, got %d"
             raise ValueError(msg % len(key))
@@ -418,50 +489,120 @@ class NullFreeEncoder (Encoder):
             raise ValueError(msg % len(terminator))
         try:
             if terminator == "\x00\x00\x00\x00":
+                if len(key) == 4:
 
-                # ; 14 bytes, +7 per extra DWORD in the key
-                # decoder: add esi, byte payload
-                #          mov edi, esi
-                # decrypt: lodsd
-                #          xor eax, 0xBAADF00D ; XOR key
-                #          stosd
-                #          ; insert more LODSD/XOR/STOSD here...
-                #          jnz decrypt  ; terminator is hardcoded to four nulls
-                # payload: ; encoded bytes go here
+                    # ; 14 bytes
+                    # decoder: add esi, byte payload
+                    #          mov edi, esi
+                    # decrypt: lodsd
+                    #          xor eax, 0xBAADF00D ; XOR key
+                    #          stosd
+                    #          jnz decrypt  ; terminator is null
+                    # payload: ; encoded bytes go here
 
-                pack = struct.pack
-                var_size = ((len(key) >> 2) * 7)
-                decoder = ["\x83\xC6" + pack("B", 7 + var_size) + "\x89\xF7"]
-                key_deltas = []
-                for i in xrange(0, len(key), 4):
-                    key_deltas.append(7 + (i * 7))
-                    decoder.append("\xAD\x35" + key[i:i+4] + "\xAB")
-                decoder.append("\x75" + pack("b", -2 - var_size))
-                return "".join(decoder), key_deltas, None
+                    decoder = (
+                        "\x83\xC6\x0E"
+                        "\x89\xF7"
+                        "\xAD"
+                        "\x35" + key +
+                        "\xAB"
+                        "\x75\xF7"
+                    )
+                    return decoder, [7], None
+
+                else:
+
+                    # ; 16 bytes, +7 per extra DWORD in the key
+                    # decoder: add esi, byte payload
+                    #          mov edi, esi
+                    # decrypt: lodsd
+                    #          xor eax, 0xBAADF00D ; XOR key
+                    #          stosd
+                    #          jz payload          ; terminator is null
+                    #          ; insert more LODSD/XOR/STOSD here...
+                    #          jmp short decrypt
+                    # payload: ; encoded bytes go here
+
+                    var_size = ((len(key) >> 2) * 7)
+                    decoder = ["\x83\xC6" + pack("b", 9 + var_size) +
+                               "\x89\xF7"]
+                    key_deltas = []
+                    delta = 7
+                    for i in xrange(0, len(key), 4):
+                        key_deltas.append(delta)
+                        if i:
+                            chunk = ("\xAD"
+                                     "\x35" + key[i:i+4] +
+                                     "\xAB")
+                        else:
+                            chunk = ("\xAD"
+                                     "\x35" + key[i:i+4] +
+                                     "\xAB"
+                                     "\x74" + pack("b", var_size - 5))
+                        decoder.append(chunk)
+                        delta += len(chunk)
+                    decoder.append("\xEB" + pack("b", -4 - var_size))
+                    return "".join(decoder), key_deltas, None
 
             else:
+                if len(key) == 4:
 
-                # ; 19 bytes, +7 per extra DWORD in the key
-                # decoder: add esi, byte payload
-                #          mov edi, esi
-                # decrypt: lodsd
-                #          xor eax, 0xBAADF00D ; XOR key
-                #          ; insert more XORs here, patch the ADD ESI above
-                #          stosd
-                #          cmp eax, 0xDEADBEEF ; terminator
-                #          jnz decrypt
-                # payload: ; encoded bytes go here
+                    # ; 19 bytes
+                    # decoder: add esi, byte payload
+                    #          mov edi, esi
+                    # decrypt: lodsd
+                    #          xor eax, 0xBAADF00D ; XOR key
+                    #          stosd
+                    #          cmp eax, 0xDEADBEEF ; terminator
+                    #          jnz decrypt
+                    # payload: ; encoded bytes go here
 
-                pack = struct.pack
-                var_size = (len(key) >> 2) * 7
-                decoder = ["\x83\xC6" + pack("B", 12 + var_size) + "\x89\xF7"]
-                key_deltas = []
-                for i in xrange(0, len(key), 4):
-                    key_deltas.append(7 + (i * 7))
-                    decoder.append("\xAD\x35" + key[i:i+4] + "\xAB")
-                decoder.append("\x3D" + terminator +
-                               "\x75" + pack("b", -7 - var_size))
-                return "".join(decoder), key_deltas, var_size + 6
+                    decoder = (
+                        "\x83\xC6\x13"
+                        "\x89\xF7"
+                        "\xAD"
+                        "\x35" + key +
+                        "\xAB"
+                        "\x3D" + terminator +
+                        "\x75\xF2"
+                    )
+                    return decoder, [7], 13
+
+                else:
+
+                    # ; 21 bytes, +7 per extra DWORD in the key
+                    # decoder: add esi, byte payload
+                    #          mov edi, esi
+                    # decrypt: lodsd
+                    #          xor eax, 0xBAADF00D ; XOR key
+                    #          stosd
+                    #          cmp eax, 0xDEADBEEF ; terminator
+                    #          jz payload
+                    #          ; insert more LODSD/XOR/STOSD here...
+                    #          jmp short decrypt
+                    # payload: ; encoded bytes go here
+
+                    var_size = (len(key) >> 2) * 7
+                    decoder = ["\x83\xC6" + pack("b", 14 + var_size) +
+                               "\x89\xF7"]
+                    key_deltas = []
+                    delta = 7
+                    for i in xrange(0, len(key), 4):
+                        key_deltas.append(delta)
+                        if i:
+                            chunk = ("\xAD"
+                                     "\x35" + key[i:i+4] +
+                                     "\xAB")
+                        else:
+                            chunk = ("\xAD"
+                                     "\x35" + key[i:i+4] +
+                                     "\xAB"
+                                     "\x3D" + terminator +
+                                     "\x74" + pack("b", var_size - 5))
+                        decoder.append(chunk)
+                        delta += len(chunk)
+                    decoder.append("\xEB" + pack("b", -9 - var_size))
+                    return "".join(decoder), key_deltas, 13
 
         except struct.error:
             raise CompileError("The decoder stub could not be compiled.", cls)
@@ -472,10 +613,10 @@ class NullFreeEncoder (Encoder):
         Encode the bytecode with the given variable size XOR key.
 
         @type  bytes: str
-        @param bytes: Bytecode to encode.
+        @param bytes: Bytecode to encode. Must be aligned to the key size.
 
         @type  key: str
-        @param key: XOR key.
+        @param key: XOR key. Must be aligned to DWORD.
 
         @type  terminator: str
         @param terminator: Terminator token. Must be a DWORD.
@@ -483,6 +624,12 @@ class NullFreeEncoder (Encoder):
         @rtype:  str
         @return: Encoded bytecode.
         """
+        if len(terminator) != 4:
+            raise ValueError("Terminator token must be a DWORD")
+        if len(key) % 4:
+            raise ValueError("Key size must be aligned to DWORD")
+        if len(bytes) % len(key):
+            raise ValueError("Bytecode size must be aligned to key size")
         bytes += terminator
         unpack = struct.unpack
         fmt = "B" * len(bytes)
@@ -564,6 +711,10 @@ class NullFreeEncoder (Encoder):
 def test():
     from ..base import CompilerState
 
+    # True to write out shellcode samples to disk.
+    WRITE = False
+    #WRITE = True
+
     # A different implementation of XOR.
     def xor(bytes, key):
         return "".join([chr(ord(bytes[i])^ord(key[i%len(key)]))
@@ -572,8 +723,10 @@ def test():
     # Test the 8-bit algorithm.
     bytes = "\x00" * 500
     key, terminator = NullFreeEncoder.find_key_8(bytes)
-    assert "\x00" not in key
-    assert "\x00" not in terminator
+    assert len(key) == 1
+    assert len(terminator) == 1
+    assert "\x00" != key
+    assert "\x00" != terminator
     encoded = NullFreeEncoder.encode_8(bytes, key, terminator)
     assert "\x00" not in encoded
     stub = NullFreeEncoder.get_decoder_8(key, terminator)
@@ -583,15 +736,40 @@ def test():
     state = CompilerState()
     state.previous["pc"] = "esi"
     shellcode.compile(state)
-    ##with open("nullfree.bin", "wb") as fd: fd.write(shellcode.bytes)
-    ##with open("nullfree2.bin", "wb") as fd: fd.write(stub + encoded)
+    if WRITE:
+        with open("nullfree1.bin", "wb") as fd: fd.write(shellcode.bytes)
     key = shellcode.bytes[-2]
     terminator = chr( ord(shellcode.bytes[-1]) ^ ord(key) )
     encoded = NullFreeEncoder.encode_8(bytes, key, terminator)
     stub = NullFreeEncoder.get_decoder_8(key, terminator)
     assert shellcode.bytes == stub + encoded
 
+    # Test the 8-bit algorithm for null terminated payloads.
+    bytes = ("A" * 499) + "\0"
+    key, terminator = NullFreeEncoder.find_key_8(bytes)
+    assert len(key) == 1
+    assert len(terminator) == 1
+    assert "\x00" != key
+    assert "\x00" == terminator
+    encoded = NullFreeEncoder.encode_8(bytes, key, terminator)
+    assert "\x00" not in encoded
+    stub = NullFreeEncoder.get_decoder_8(key, terminator)
+    assert "\x00" not in stub
+    assert xor(encoded, key) == bytes
+    shellcode = NullFreeEncoder(bytes)
+    state = CompilerState()
+    state.previous["pc"] = "esi"
+    shellcode.compile(state)
+    if WRITE:
+        with open("nullfree2.bin", "wb") as fd: fd.write(shellcode.bytes)
+    key = chr( ord(shellcode.bytes[-2]) ^ ord("A") )
+    terminator = chr( ord(shellcode.bytes[-1]) ^ ord(key) )
+    encoded = NullFreeEncoder.encode_8(bytes, key, terminator)
+    stub = NullFreeEncoder.get_decoder_8(key, terminator)
+    assert shellcode.bytes == stub + encoded
+
     # Test the insertion of GetPC when using the 8-bit algorithm.
+    bytes = "\x00" * 500
     shellcode = NullFreeEncoder(bytes)
     state = CompilerState()
     state.previous["pc"] = "esi"
@@ -638,8 +816,8 @@ def test():
     state = CompilerState()
     state.previous["pc"] = "esi"
     shellcode.compile(state)
-    ##with open("nullfree3.bin", "wb") as fd: fd.write(shellcode.bytes)
-    ##with open("nullfree4.bin", "wb") as fd: fd.write(stub + encoded)
+    if WRITE:
+        with open("nullfree3.bin", "wb") as fd: fd.write(shellcode.bytes)
     assert len(key_deltas) == 1
     key = shellcode.bytes[key_deltas[0]:key_deltas[0]+4]
     terminator = struct.pack("<L",
@@ -668,8 +846,8 @@ def test():
     state = CompilerState()
     state.previous["pc"] = "esi"
     shellcode.compile(state)
-    ##with open("nullfree5.bin", "wb") as fd: fd.write(shellcode.bytes)
-    ##with open("nullfree6.bin", "wb") as fd: fd.write(stub + encoded)
+    if WRITE:
+        with open("nullfree4.bin", "wb") as fd: fd.write(shellcode.bytes)
     key = shellcode.bytes[-8:-4]
     terminator = struct.pack("<L",
                              struct.unpack("<L", shellcode.bytes[-4:])[0] ^
@@ -709,8 +887,7 @@ def test():
     assert len(getpc_normal) == len(no_getpc) + GetPC.length
 
     # Test the insertion of GetPC with the 32-bit algorithm, long decoder.
-    bytes = "".join([chr(x) for x in xrange(256)])
-    bytes += "\x00\x00\x00\x00"
+    bytes = "\x00\x00\x00\x00" + "".join([chr(x) for x in xrange(256)])
     shellcode = NullFreeEncoder(bytes)
     state = CompilerState()
     state.previous["pc"] = "esi"
@@ -726,11 +903,19 @@ def test():
     assert len(getpc_normal) == len(no_getpc) + GetPC.length
 
     # Test the 32-bit algorithm for longer keys.
-    bytes = "".join([(chr(x) * 64) for x in xrange(256)])
+    bytes = "".join([(chr(x) * 32) for x in xrange(256)])
     shellcode = NullFreeEncoder(bytes)
     assert "\x00" not in shellcode.bytes
     assert len(shellcode.bytes) > (len(bytes) + 4)
-    ##with open("nullfree7.bin", "wb") as fd: fd.write(shellcode.bytes)
+    if WRITE:
+        with open("nullfree5.bin", "wb") as fd: fd.write(shellcode.bytes)
+    bytes = bytes.replace("\0"*32, "\0"+("A"*31))
+    assert list(bytes).count('\0') == 1
+    shellcode = NullFreeEncoder(bytes)
+    assert "\x00" not in shellcode.bytes
+    assert len(shellcode.bytes) > (len(bytes) + 4)
+    if WRITE:
+        with open("nullfree6.bin", "wb") as fd: fd.write(shellcode.bytes)
 
     # Test a corner case that can't be encoded by this algorithm.
     # The decoder stub gets too large and fails to compile.
