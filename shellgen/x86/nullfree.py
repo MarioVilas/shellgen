@@ -733,11 +733,11 @@ def test():
     assert "\x00" not in stub
     assert xor(encoded, key) == bytes + terminator
     shellcode = NullFreeEncoder(bytes)
+    if WRITE:
+        with open("nullfree1.bin", "wb") as fd: fd.write(shellcode.bytes)
     state = CompilerState()
     state.previous["pc"] = "esi"
     shellcode.compile(state)
-    if WRITE:
-        with open("nullfree1.bin", "wb") as fd: fd.write(shellcode.bytes)
     key = shellcode.bytes[-2]
     terminator = chr( ord(shellcode.bytes[-1]) ^ ord(key) )
     encoded = NullFreeEncoder.encode_8(bytes, key, terminator)
@@ -757,11 +757,11 @@ def test():
     assert "\x00" not in stub
     assert xor(encoded, key) == bytes
     shellcode = NullFreeEncoder(bytes)
+    if WRITE:
+        with open("nullfree2.bin", "wb") as fd: fd.write(shellcode.bytes)
     state = CompilerState()
     state.previous["pc"] = "esi"
     shellcode.compile(state)
-    if WRITE:
-        with open("nullfree2.bin", "wb") as fd: fd.write(shellcode.bytes)
     key = chr( ord(shellcode.bytes[-2]) ^ ord("A") )
     terminator = chr( ord(shellcode.bytes[-1]) ^ ord(key) )
     encoded = NullFreeEncoder.encode_8(bytes, key, terminator)
