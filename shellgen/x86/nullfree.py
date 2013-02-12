@@ -782,7 +782,7 @@ def test():
     shellcode.compile()
     getpc_normal = shellcode.bytes
     assert len(getpc_from_eax) == len(no_getpc) + 2
-    assert len(getpc_normal) == len(no_getpc) + GetPC.length
+    assert len(getpc_normal) == len(no_getpc) + GetPC().length  # XXX
 
     # Test the corner case for the 8-bit algorithm.
     bytes = "".join([chr(x) for x in xrange(256)])
@@ -884,7 +884,7 @@ def test():
     shellcode.compile()
     getpc_normal = shellcode.bytes
     assert len(getpc_from_eax) == len(no_getpc) + 2
-    assert len(getpc_normal) == len(no_getpc) + GetPC.length
+    assert len(getpc_normal) == len(no_getpc) + GetPC().length  # XXX
 
     # Test the insertion of GetPC with the 32-bit algorithm, long decoder.
     bytes = "\x00\x00\x00\x00" + "".join([chr(x) for x in xrange(256)])
@@ -900,7 +900,7 @@ def test():
     shellcode.compile()
     getpc_normal = shellcode.bytes
     assert len(getpc_from_eax) == len(no_getpc) + 2
-    assert len(getpc_normal) == len(no_getpc) + GetPC.length
+    assert len(getpc_normal) == len(no_getpc) + GetPC().length  # XXX
 
     # Test the 32-bit algorithm for longer keys.
     bytes = "".join([(chr(x) * 12) for x in xrange(256)])
