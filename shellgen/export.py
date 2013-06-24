@@ -22,18 +22,38 @@
 # MA 02110-1301, USA.
 
 """
-Shellcode export formats for ShellGen
+Shellcode export formats for ShellGen.
+
+@type exporters: dict(str -> callable)
+@var  exporters:
+    Map of output formats to their corresponding exporter functions.
+    If you add your own format here, L{export}() will use it.
 """
 
 from __future__ import absolute_import
 
+import struct
+
 __all__ = [
+
+    # Generic entrypoint.
+    "export",
+    "exporter",
+    "exporters",
+
+    # Exporter functions.
+    "as_raw_binary",
+    "as_hexadecimal",
     "as_python_source",
+    "as_ruby_source",
+    "as_perl_source",
+    "as_php_source",
+    "as_c_source",
 ]
 
 #-----------------------------------------------------------------------------#
 
-def export(fn):
+def exporter(fn):
     """
     Decorator function for shellcode exporters.
 
@@ -41,7 +61,7 @@ def export(fn):
     into an open file object which is ensured to be closed before
     returning.
     """
-    def _export(shellcode, output):
+    def _exporter(shellcode, output):
         if not hasattr(shellcode, "bytes"):
             raise TypeError(
                 "Expected Shellcode, got %s instead" % type(shellcode))
@@ -52,13 +72,36 @@ def export(fn):
 
 #-----------------------------------------------------------------------------#
 
-@export
+# Internal function to export to source in most programming languages.
+def _generic_source_exporter(shellcode, output, prologue, epilogue,
+                             char_fmt = "\\x%.2x",
+                             line_fmt = "    \"%s\"\n"):
+    bytes = shellcode.bytes
+    chars = struct.unpack("B" * len(bytes), bytes)
+    output.write(prologue)
+    size = len(prologue)
+    for index in xrange(0, len(chars), 16):
+        line = "".join( char_fmt % c for c in chars[ index : index + 16 ] )
+        line = line_fmt % line
+        output.write(line)
+        size += len(line)
+    output.write(epilogue)
+    size += len(epilogue)
+    return size
+
+#-----------------------------------------------------------------------------#
+# All export functions have the exact same interface.
+
+@exporter
 def as_raw_binary(shellcode, output):
     """
     Export the given shellcode as a raw binary file.
 
     @note: This function will not generate executable files.
         The bytecode is just dumped into the file without format.
+
+    @warn: The file B{MUST} be opened in B{binary} mode.
+        Failure to do so may result in data corruption!
 
     @type  shellcode: L{Shellcode}
     @param shellcode: Any shellcode.
@@ -69,9 +112,11 @@ def as_raw_binary(shellcode, output):
     @rtype:  int
     @return: Number of bytes written.
     """
-    raise NotImplementedError("This export format is not implemented yet.")
+    bytes = shellcode.bytes
+    output.write(bytes)
+    return len(bytes)
 
-@export
+@exporter
 def as_hexadecimal(shellcode, output):
     """
     Export the given shellcode as an hexadecimal string.
@@ -85,10 +130,17 @@ def as_hexadecimal(shellcode, output):
 
     @rtype:  int
     @return: Number of bytes written.
+        May be inaccurate if the file was not opened in binary mode on certain
+        platforms. For example on Windows an extra C{\r} will be prepended to
+        each C{\n} character by Python without this function knowing about it.
     """
-    raise NotImplementedError("This export format is not implemented yet.")
+    bytes = shellcode.bytes
+    chars = struct.unpack("B" * len(bytes), bytes)
+    hexa  = " ".join("%.2X" % c for c in chars) + "\n"
+    output.write(hexa)
+    return len(hexa)
 
-@export
+@exporter
 def as_python_source(shellcode, output):
     """
     Export the given shellcode as Python source code
@@ -102,10 +154,17 @@ def as_python_source(shellcode, output):
 
     @rtype:  int
     @return: Number of bytes written.
+        May be inaccurate if the file was not opened in binary mode on certain
+        platforms. For example on Windows an extra C{\r} will be prepended to
+        each C{\n} character by Python without this function knowing about it.
     """
-    raise NotImplementedError("This export format is not implemented yet.")
+    return _generic_source_exporter(
+        shellcode, output,
+        prologue = "shellcode = (\n",
+        epilogue = ")\n",
+    )
 
-@export
+@exporter
 def as_ruby_source(shellcode, output):
     """
     Export the given shellcode as Ruby source code
@@ -119,10 +178,13 @@ def as_ruby_source(shellcode, output):
 
     @rtype:  int
     @return: Number of bytes written.
+        May be inaccurate if the file was not opened in binary mode on certain
+        platforms. For example on Windows an extra C{\r} will be prepended to
+        each C{\n} character by Python without this function knowing about it.
     """
     raise NotImplementedError("This export format is not implemented yet.")
 
-@export
+@exporter
 def as_perl_source(shellcode, output):
     """
     Export the given shellcode as Perl source code
@@ -136,10 +198,13 @@ def as_perl_source(shellcode, output):
 
     @rtype:  int
     @return: Number of bytes written.
+        May be inaccurate if the file was not opened in binary mode on certain
+        platforms. For example on Windows an extra C{\r} will be prepended to
+        each C{\n} character by Python without this function knowing about it.
     """
     raise NotImplementedError("This export format is not implemented yet.")
 
-@export
+@exporter
 def as_php_source(shellcode, output):
     """
     Export the given shellcode as PHP source code
@@ -153,10 +218,13 @@ def as_php_source(shellcode, output):
 
     @rtype:  int
     @return: Number of bytes written.
+        May be inaccurate if the file was not opened in binary mode on certain
+        platforms. For example on Windows an extra C{\r} will be prepended to
+        each C{\n} character by Python without this function knowing about it.
     """
     raise NotImplementedError("This export format is not implemented yet.")
 
-@export
+@exporter
 def as_c_source(shellcode, output):
     """
     Export the given shellcode as C source code
@@ -170,5 +238,66 @@ def as_c_source(shellcode, output):
 
     @rtype:  int
     @return: Number of bytes written.
+        May be inaccurate if the file was not opened in binary mode on certain
+        platforms. For example on Windows an extra C{\r} will be prepended to
+        each C{\n} character by Python without this function knowing about it.
     """
-    raise NotImplementedError("This export format is not implemented yet.")
+    return _generic_source_exporter(
+        shellcode, output,
+        prologue = "char shellcode[] = {\n",
+        epilogue = "};\n",
+    )
+
+#-----------------------------------------------------------------------------#
+
+# Map of output formats to their corresponding exporter functions.
+exporters = {
+    "raw":    as_raw_binary,
+    "hex":    as_hexadecimal,
+    "python": as_python_source,
+    "ruby":   as_ruby_source,
+    "perl":   as_perl_source,
+    "php":    as_php_source,
+    "c":      as_c_source,
+}
+
+# Parameterized exporter functions entry point.
+def export(shellcode, output, format = "python"):
+    """
+    Export the given shellcode with the desired format.
+
+    @note: Generally you'll want to use this function only when the output
+        format comes from user input. In your own scripts you can just call
+        the corresponding exporter function from this module.
+
+    @warn: For binary output formats, the output file B{MUST} be opened in
+        B{binary} mode. Failure to do so may result in data corruption!
+
+    @type  shellcode: L{Shellcode}
+    @param shellcode: Any shellcode.
+
+    @type  output: file or str
+    @param output: Filename or open file object.
+
+    @type  format: str
+    @param format: Desired output format.
+        Must be one of the following:
+         - C{"raw"}: Raw binary file with no format.
+         - C{"hex"}: Hexadecimal string.
+         - C{"python"}: Python source code.
+         - C{"ruby"}: Ruby source code.
+         - C{"perl"}: Perl source code.
+         - C{"php"}: PHP source code.
+         - C{"c"}: C source code.
+
+    @rtype:  int
+    @return: Number of bytes written.
+        May be inaccurate if the file was not opened in binary mode on certain
+        platforms. For example on Windows an extra C{\r} will be prepended to
+        each C{\n} character by Python without this function knowing about it.
+    """
+    try:
+        function = exporters[ format.strip().lower() ]
+    except KeyError:
+        raise ValueError("Unknown output format: %r" % format)
+    return function(shellcode, output)
