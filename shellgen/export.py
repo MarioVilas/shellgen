@@ -75,14 +75,25 @@ def exporter(fn):
 # Internal function to export to source in most programming languages.
 def _generic_source_exporter(shellcode, output, prologue, epilogue,
                              char_fmt = "\\x%.2x",
-                             line_fmt = "    \"%s\"\n"):
+                             line_fmt = "    \"%s\"\n",
+                             last_fmt = None):
     bytes = shellcode.bytes
     chars = struct.unpack("B" * len(bytes), bytes)
+    try:
+        prologue %= len(bytes)
+    except Exception:
+        pass
     output.write(prologue)
     size = len(prologue)
+    last_index = len(chars) & (~15)
+    if not last_fmt:
+        last_fmt = line_fmt
     for index in xrange(0, len(chars), 16):
         line = "".join( char_fmt % c for c in chars[ index : index + 16 ] )
-        line = line_fmt % line
+        if index < last_index:
+            line = line_fmt % line
+        else:
+            line = last_fmt % line
         output.write(line)
         size += len(line)
     output.write(epilogue)
@@ -160,7 +171,7 @@ def as_python_source(shellcode, output):
     """
     return _generic_source_exporter(
         shellcode, output,
-        prologue = "shellcode = (\n",
+        prologue = "# %d bytes\nshellcode = (\n",
         epilogue = ")\n",
     )
 
@@ -182,7 +193,13 @@ def as_ruby_source(shellcode, output):
         platforms. For example on Windows an extra C{\r} will be prepended to
         each C{\n} character by Python without this function knowing about it.
     """
-    raise NotImplementedError("This export format is not implemented yet.")
+    return _generic_source_exporter(
+        shellcode, output,
+        prologue = "# %d bytes\nshellcode = \\\n",
+        line_fmt = "    \"%s\"\\\n",
+        last_fmt = "    \"%s\"\n",
+        epilogue = "",
+    )
 
 @exporter
 def as_perl_source(shellcode, output):
@@ -202,7 +219,13 @@ def as_perl_source(shellcode, output):
         platforms. For example on Windows an extra C{\r} will be prepended to
         each C{\n} character by Python without this function knowing about it.
     """
-    raise NotImplementedError("This export format is not implemented yet.")
+    return _generic_source_exporter(
+        shellcode, output,
+        prologue = "# %d bytes\nmy $shellcode =\n",
+        line_fmt = "\"%s\" .\n",
+        last_fmt = "\"%s\";\n",
+        epilogue = "",
+    )
 
 @exporter
 def as_php_source(shellcode, output):
@@ -222,7 +245,13 @@ def as_php_source(shellcode, output):
         platforms. For example on Windows an extra C{\r} will be prepended to
         each C{\n} character by Python without this function knowing about it.
     """
-    raise NotImplementedError("This export format is not implemented yet.")
+    return _generic_source_exporter(
+        shellcode, output,
+        prologue = "# %d bytes\n$shellcode = ''\n",
+        line_fmt = "           . '%s'\n",
+        last_fmt = "           . '%s';\n",
+        epilogue = "$js_shellcode = 'var shellcode=unescape(\"' . urlencode($shellcode) . '\");';\n",
+    )
 
 @exporter
 def as_c_source(shellcode, output):
@@ -244,7 +273,7 @@ def as_c_source(shellcode, output):
     """
     return _generic_source_exporter(
         shellcode, output,
-        prologue = "char shellcode[] = {\n",
+        prologue = "// %d bytes\nchar shellcode[] = {\n",
         epilogue = "};\n",
     )
 
