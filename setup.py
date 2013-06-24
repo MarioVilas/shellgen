@@ -42,7 +42,6 @@ metadata = {
     'author'            : 'Mario Vilas',
     'author_email'      : 'mvilas'+chr(64)+'gmail'+chr(0x2e)+'com',
     'url'               : 'http://inguma.eu/projects/shellgen',
-    'platforms'         : ['win32', 'win64'],
     'classifiers'       : [
                         'License :: OSI Approved :: BSD License',
                         'Development Status :: 1 - Planning',
