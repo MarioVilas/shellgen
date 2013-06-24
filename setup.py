@@ -93,6 +93,9 @@ class TestCommand(Command):
         print "testing shellgen.payload"
         from shellgen.payload import test
         test()
+        print "testing shellgen.export"
+        from shellgen.export import test
+        test()
         from shellgen.util import get_available_platforms, \
                                   get_available_modules
         for module in get_available_modules("abstract", "any"):

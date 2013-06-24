@@ -49,6 +49,7 @@ __all__ = [
     "as_perl_source",
     "as_php_source",
     "as_c_source",
+    "as_cpp_source",
 ]
 
 #-----------------------------------------------------------------------------#
@@ -69,35 +70,69 @@ def exporter(fn):
             with open(output, "wb") as output:
                 return fn(shellcode, output)
         return fn(shellcode, output)
+    return _exporter
 
 #-----------------------------------------------------------------------------#
 
 # Internal function to export to source in most programming languages.
-def _generic_source_exporter(shellcode, output, prologue, epilogue,
-                             char_fmt = "\\x%.2x",
-                             line_fmt = "    \"%s\"\n",
-                             last_fmt = None):
+def _generic_source_exporter(shellcode, output,
+                             prologue, epilogue,
+                             char_fmt, line_fmt,
+                             char_sep  = "",
+                             first_fmt = None,
+                             last_fmt  = None):
+
+    # First and last line default to the same as the middle lines.
+    if not first_fmt:
+        first_fmt = line_fmt
+    if not last_fmt:
+        last_fmt = line_fmt
+
+    # Convert the bytecode into an array of numeric chars.
     bytes = shellcode.bytes
     chars = struct.unpack("B" * len(bytes), bytes)
+
+    # Add the bytecode size to the prologue, if supported.
     try:
         prologue %= len(bytes)
     except Exception:
         pass
+
+    # Write the prologue.
     output.write(prologue)
     size = len(prologue)
+
+    # Write the first line.
+    line = char_sep.join( char_fmt % c for c in chars[:16] )
+    line = first_fmt % line
+    output.write(line)
+    size += len(line)
+
+    # Calculate the index for the last line.
     last_index = len(chars) & (~15)
-    if not last_fmt:
-        last_fmt = line_fmt
-    for index in xrange(0, len(chars), 16):
-        line = "".join( char_fmt % c for c in chars[ index : index + 16 ] )
-        if index < last_index:
-            line = line_fmt % line
-        else:
-            line = last_fmt % line
+    if last_index == len(chars):
+        last_index = len(chars) - 16
+        if last_index < 0:
+            last_index = 0
+
+    # Write the middle lines.
+    for index in xrange(16, last_index, 16):
+        line = char_sep.join( char_fmt % c for c in chars[index : index + 16] )
+        line = line_fmt % line
         output.write(line)
         size += len(line)
+
+    # Write the last line.
+    line = char_sep.join( char_fmt % c for c in chars[last_index:] )
+    line = last_fmt % line
+    output.write(line)
+    size += len(line)
+
+    # Write the epilog.
     output.write(epilogue)
     size += len(epilogue)
+
+    # Return the number of bytes written.
     return size
 
 #-----------------------------------------------------------------------------#
@@ -145,11 +180,19 @@ def as_hexadecimal(shellcode, output):
         platforms. For example on Windows an extra C{\r} will be prepended to
         each C{\n} character by Python without this function knowing about it.
     """
-    bytes = shellcode.bytes
-    chars = struct.unpack("B" * len(bytes), bytes)
-    hexa  = " ".join("%.2X" % c for c in chars) + "\n"
-    output.write(hexa)
-    return len(hexa)
+    return _generic_source_exporter(
+        shellcode, output,
+        prologue = "",
+        char_sep = " ",
+        char_fmt = "%.2X",
+        line_fmt = "%s\n",
+        epilogue = "",
+    )
+    #bytes = shellcode.bytes
+    #chars = struct.unpack("B" * len(bytes), bytes)
+    #hexa  = " ".join("%.2X" % c for c in chars) + "\n"
+    #output.write(hexa)
+    #return len(hexa)
 
 @exporter
 def as_python_source(shellcode, output):
@@ -172,6 +215,8 @@ def as_python_source(shellcode, output):
     return _generic_source_exporter(
         shellcode, output,
         prologue = "# %d bytes\nshellcode = (\n",
+        char_fmt = "\\x%.2x",
+        line_fmt = "    \"%s\"\n",
         epilogue = ")\n",
     )
 
@@ -196,8 +241,9 @@ def as_ruby_source(shellcode, output):
     return _generic_source_exporter(
         shellcode, output,
         prologue = "# %d bytes\nshellcode = \\\n",
-        line_fmt = "    \"%s\"\\\n",
-        last_fmt = "    \"%s\"\n",
+        char_fmt = "\\x%.2x",
+        line_fmt = "  \"%s\"\\\n",
+        last_fmt = "  \"%s\"\n",
         epilogue = "",
     )
 
@@ -222,6 +268,7 @@ def as_perl_source(shellcode, output):
     return _generic_source_exporter(
         shellcode, output,
         prologue = "# %d bytes\nmy $shellcode =\n",
+        char_fmt = "\\x%.2x",
         line_fmt = "\"%s\" .\n",
         last_fmt = "\"%s\";\n",
         epilogue = "",
@@ -247,10 +294,12 @@ def as_php_source(shellcode, output):
     """
     return _generic_source_exporter(
         shellcode, output,
-        prologue = "# %d bytes\n$shellcode = ''\n",
-        line_fmt = "           . '%s'\n",
-        last_fmt = "           . '%s';\n",
-        epilogue = "$js_shellcode = 'var shellcode=unescape(\"' . urlencode($shellcode) . '\");';\n",
+        prologue  = "# %d bytes\n",
+        char_fmt = "\\x%.2x",
+        first_fmt = "$shellcode = '%s'\n",
+        line_fmt  = "           . '%s'\n",
+        last_fmt  = "           . '%s';\n",
+        epilogue  = "$js_shellcode = 'var shellcode=unescape(\"' . urlencode($shellcode) . '\");';\n",
     )
 
 @exporter
@@ -273,7 +322,35 @@ def as_c_source(shellcode, output):
     """
     return _generic_source_exporter(
         shellcode, output,
+        prologue = "/* %d bytes */\nchar shellcode[] = {\n",
+        char_fmt = "\\x%.2x",
+        line_fmt = "    \"%s\"\n",
+        epilogue = "};\n",
+    )
+
+@exporter
+def as_cpp_source(shellcode, output):
+    """
+    Export the given shellcode as C++ source code
+    to be embedded into your exploit.
+
+    @type  shellcode: L{Shellcode}
+    @param shellcode: Any shellcode.
+
+    @type  output: file or str
+    @param output: Filename or open file object.
+
+    @rtype:  int
+    @return: Number of bytes written.
+        May be inaccurate if the file was not opened in binary mode on certain
+        platforms. For example on Windows an extra C{\r} will be prepended to
+        each C{\n} character by Python without this function knowing about it.
+    """
+    return _generic_source_exporter(
+        shellcode, output,
         prologue = "// %d bytes\nchar shellcode[] = {\n",
+        char_fmt = "\\x%.2x",
+        line_fmt = "    \"%s\"\n",
         epilogue = "};\n",
     )
 
@@ -288,6 +365,7 @@ exporters = {
     "perl":   as_perl_source,
     "php":    as_php_source,
     "c":      as_c_source,
+    "c++":    as_cpp_source,
 }
 
 # Parameterized exporter functions entry point.
@@ -313,11 +391,12 @@ def export(shellcode, output, format = "python"):
         Must be one of the following:
          - C{"raw"}: Raw binary file with no format.
          - C{"hex"}: Hexadecimal string.
-         - C{"python"}: Python source code.
-         - C{"ruby"}: Ruby source code.
-         - C{"perl"}: Perl source code.
-         - C{"php"}: PHP source code.
-         - C{"c"}: C source code.
+         - C{"Python"}: Python source code.
+         - C{"Ruby"}: Ruby source code.
+         - C{"Perl"}: Perl source code.
+         - C{"PHP"}: PHP source code.
+         - C{"C"}: C source code.
+         - C{"C++"}: C++ source code.
 
     @rtype:  int
     @return: Number of bytes written.
@@ -330,3 +409,24 @@ def export(shellcode, output, format = "python"):
     except KeyError:
         raise ValueError("Unknown output format: %r" % format)
     return function(shellcode, output)
+
+#-----------------------------------------------------------------------------#
+
+def test():
+    "Unit test."
+
+    from .base import Static
+
+    class TestShellcode(Static):
+        bytes = struct.pack("B"*256,*range(256))
+
+    shellcode = TestShellcode()
+
+    export(shellcode, "test_export.bin", "raw\n")
+    export(shellcode, "test_export.txt", " HEX ")
+    export(shellcode, "test_export.py",  "Python")
+    export(shellcode, "test_export.rb",  "Ruby")
+    export(shellcode, "test_export.pl",  "Perl")
+    export(shellcode, "test_export.php", "PHP")
+    export(shellcode, "test_export.c",   "C")
+    export(shellcode, "test_export.cpp", "C++")
