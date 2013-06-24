@@ -43,11 +43,14 @@ __all__ = [
 
     # Exporter functions.
     "as_raw_binary",
+    "as_base64",
     "as_hexadecimal",
     "as_python_source",
     "as_ruby_source",
     "as_perl_source",
     "as_php_source",
+    "as_javascript_source",
+    "as_vbscript_source",
     "as_c_source",
     "as_cpp_source",
 ]
@@ -498,7 +501,7 @@ def test():
 
     from .base import Static
 
-    shellcode_size = 250
+    shellcode_size = 256
 
     class TestShellcode(Static):
         bytes = struct.pack("B"*shellcode_size,*range(shellcode_size))
