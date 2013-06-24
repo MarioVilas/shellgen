@@ -456,6 +456,17 @@ def random_chars(length, bad_chars = None):
 #-----------------------------------------------------------------------------#
 
 def is_stack_balanced(shellcode):
+    """
+    Determines if a given shellcode is stack balanced,
+    by examining its metadata.
+
+    @type  shellcode: L{Shellcode}
+    @param shellcode: Any shellcode.
+
+    @rtype:  bool
+    @return: C{True} if the shellcode's metadata claims it's stack balanced,
+        C{False otherwise}.
+    """
     queue = [shellcode]
     while queue:
         shellcode = queue.pop()
@@ -769,3 +780,5 @@ def test():
     assert find_shellcode(test3, Concatenator)   is test3
     assert list(iter_shellcode(test3, Static)) == [test1, test2]
     assert list(iter_shellcode(test3)) == [test3, test1, test2]
+
+    # TODO: test is_stack_balanced()
