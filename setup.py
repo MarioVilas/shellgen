@@ -25,7 +25,8 @@ __all__ = ['metadata', 'setup']
 
 from distutils.core import setup, Command
 from warnings import warn
-from os.path import dirname, curdir, join
+from os import walk
+from os.path import abspath, dirname, curdir, join, isdir, isfile, sep
 
 # Define the parameters for the setup script.
 metadata = {
@@ -33,7 +34,6 @@ metadata = {
     # Setup instructions
     'requires'          : [],
     'provides'          : ['shellgen'],
-    'packages'          : ['shellgen'],
 
     # Metadata
     'name'              : 'shellgen',
@@ -58,11 +58,28 @@ metadata = {
                         ],
     }
 
+# Find out where we are.
+here = dirname(__file__)
+if not here:
+    here = curdir
+here = abspath(here)
+
+# Automatically find all packages.
+packages = []
+for root, folders, files in walk(here):
+    if "__init__.py" in files:
+        module = root[len(here):]
+        if module.startswith(sep):
+            module = module[len(sep):]
+        if module.endswith(sep):
+            module = module[:-len(sep)]
+        module = module.replace(sep, ".")
+        packages.append(module)
+packages.sort()
+metadata['packages'] = packages
+
 # Read the long description from the README file.
 try:
-    here = dirname(__file__)
-    if not here:
-        here = curdir
     readme = join(here, 'README')
     long_description = open(readme, 'r').read()
     metadata['long_description'] = long_description
