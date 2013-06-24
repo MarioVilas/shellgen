@@ -34,19 +34,19 @@ from os import path
 __all__ = [
 
     # Public symbols. Seen by the user.
-    "ShellcodeWarning", "CompileError", "EncodingError",
-    "CompilerState",
-    "Shellcode", "Dynamic", "Static", "Raw",
-    "Container", "Concatenator", "Decorator", "Encoder", "Stager",
+    'ShellcodeWarning', 'CompileError', 'EncodingError',
+    'CompilerState',
+    'Shellcode', 'Dynamic', 'Static', 'Raw',
+    'Container', 'Concatenator', 'Decorator', 'Encoder', 'Stager',
 
     # Private symbols. Seen by the shellcode developer.
-    "base_dir", "base_package", "base_file",
-    "is_valid_module_path_component", "meta_canonicalize_platform_tag",
-    "meta_canonicalize_platform", "meta_canonicalize_tags",
-    "meta_canonicalize", "meta_autodetect_platform",
-    "meta_autodetect_encoding", "meta_compile", "meta_shellcode",
-    "meta_shellcode_final", "meta_shellcode_static", "meta_shellcode_raw",
-    "copy_classes",
+    'base_dir', 'base_package', 'base_file',
+    'is_valid_module_path_component', 'meta_canonicalize_platform_tag',
+    'meta_canonicalize_platform', 'meta_canonicalize_tags',
+    'meta_canonicalize', 'meta_autodetect_platform',
+    'meta_autodetect_encoding', 'meta_compile', 'meta_shellcode',
+    'meta_shellcode_final', 'meta_shellcode_static', 'meta_shellcode_raw',
+    'copy_classes',
 ]
 
 # Get the path in the filesystem where this library is installed.
@@ -55,7 +55,7 @@ base_dir = path.abspath(path.dirname(__file__))
 # When importing, get our package and module name.
 # Fail if this file's been moved elsewhere.
 try:
-    base_package, base_file = __name__.split(".")[-2:]
+    base_package, base_file = __name__.split('.')[-2:]
 except Exception:
     msg = "Trying to load %s outside of its package" % __file__
     raise ImportError(msg)
@@ -65,13 +65,13 @@ except Exception:
 # This method may be a little paranoid, but better safe than sorry!
 def is_valid_module_path_component(token):
     "Validate strings to be used when importing modules dynamically."
-    return not token.startswith("_") and not keyword.iskeyword(token) and \
-        all( ( (x.isalnum() or x == "_") for x in token ) )
+    return not token.startswith('_') and not keyword.iskeyword(token) and \
+        all( ( (x.isalnum() or x == '_') for x in token ) )
 
 def meta_canonicalize_platform_tag(tag):
     "Canonicalizes the processor architecture. See L{meta_canonicalize}."
     if not tag:
-        tag = "any"
+        tag = 'any'
     else:
         tag = tag.strip().lower()
     return tag
@@ -120,9 +120,9 @@ def meta_canonicalize_tags(tags):
     # Unless they're multiple tags separated by commas or spaces or both.
     # Then they're treated like iterables (see below).
     elif type(tags) is str:
-        if "," in tags:
-            tags = tuple(tags.split(","))
-        elif " " in tags or "\t" in tags:
+        if ',' in tags:
+            tags = tuple(tags.split(','))
+        elif ' ' in tags or '\t' in tags:
             tags = tuple(tags.split())
         else:
             tags = (tags.strip().lower(),)
@@ -170,12 +170,12 @@ def meta_autodetect_platform(cls):
     splitext = path.splitext
     sep = path.sep
     module = cls.__module__
-    if module != "__main__":
-        tokens = cls.__module__.split(".")
+    if module != '__main__':
+        tokens = cls.__module__.split('.')
         if len(tokens) < 2 or tokens[0] != base_package or \
                               tokens[1] == base_file:
             return
-        tokens.insert(-1, "any")
+        tokens.insert(-1, 'any')
         tokens = tokens[1:3]
     else:
         module = abspath(sys.modules[module].__file__)
@@ -184,7 +184,7 @@ def meta_autodetect_platform(cls):
         tokens = module.split(sep)
         tokens = tokens[len(base_dir.split(sep)):-1]
         while len(tokens) < 2:
-            tokens.append("any")
+            tokens.append('any')
     cls.arch, cls.os = tokens
 
 def meta_autodetect_encoding(bytes):
@@ -214,28 +214,28 @@ def meta_autodetect_encoding(bytes):
     if isinstance(bytes, Shellcode):
         bytes = bytes.bytes
     if not bytes:
-        bytes = ""
-    if "\x00" not in bytes:
-        encoding.append("nullfree")
-    elif bytes.endswith("\x00") and "\x00" not in bytes[:-1]:
-        encoding.append("term_null")
+        bytes = ''
+    if '\x00' not in bytes:
+        encoding.append('nullfree')
+    elif bytes.endswith('\x00') and '\x00' not in bytes[:-1]:
+        encoding.append('term_null')
     try:
-        if bytes == bytes.encode("ascii"):
-            encoding.append("ascii")
-            if all( ((x == "\x00" or x.isalnum()) for x in bytes) ):
-                encoding.append("alpha")
+        if bytes == bytes.encode('ascii'):
+            encoding.append('ascii')
+            if all( ((x == '\x00' or x.isalnum()) for x in bytes) ):
+                encoding.append('alpha')
     except Exception:
         pass
     if bytes == bytes.lower():
-        encoding.append("lower")
+        encoding.append('lower')
     if bytes == bytes.upper():
-        encoding.append("upper")
+        encoding.append('upper')
     if len(bytes) & 1 == 0:
-        if all( ( bytes[i] == "\x00" for i in xrange(1, len(bytes), 2) ) ):
-            encoding.append("unicode")
-            if bytes.endswith("\x00\x00") and not all(
-                (bytes[i] == "\x00" for i in xrange(0, len(bytes), 2) ) ):
-                    encoding.append("term_null")
+        if all( ( bytes[i] == '\x00' for i in xrange(1, len(bytes), 2) ) ):
+            encoding.append('unicode')
+            if bytes.endswith('\x00\x00') and not all(
+                (bytes[i] == '\x00' for i in xrange(0, len(bytes), 2) ) ):
+                    encoding.append('term_null')
     return tuple(sorted(encoding))
 
 def meta_compile(compile):
@@ -246,7 +246,7 @@ def meta_compile(compile):
         if state is None:
             state = CompilerState()
         self.offset = state.offset
-        if hasattr(self, "_compile_hook"):
+        if hasattr(self, '_compile_hook'):
             bytes = self._compile_hook(compile, state)
         else:
             bytes = compile(self, state)
@@ -270,9 +270,9 @@ class meta_shellcode(type):
 
             # Wrap the compile() method if it's a new one.
             if cls.compile not in (
-                        getattr(b, "compile", None) for b in cls.__bases__):
+                        getattr(b, 'compile', None) for b in cls.__bases__):
                 cls.compile = meta_compile(cls.compile)
-            ##elif cls.__name__ not in ("Raw", "Container"):
+            ##elif cls.__name__ not in ('Raw', 'Container'):
             ##    warnings.warn(
             ##        "Not setting wrapper on class %s" % cls.__name__)
 
@@ -297,7 +297,7 @@ class meta_shellcode_static(meta_shellcode):
 
         # Make sure the user wasn't so crazy to have compile() in a Static.
         if cls.__module__ != __name__ and cls.compile not in (
-                    getattr(b, "compile", None) for b in cls.__bases__):
+                    getattr(b, 'compile', None) for b in cls.__bases__):
             msg = (
                 "What's %s.compile doing there?"
                 " Are you nuts?!"
@@ -377,7 +377,7 @@ class ShellcodeError (RuntimeError):
 
         # If given, prepend the calling class name to the message.
         if clazz is not None:
-            message = "%s: %s" % (clazz.__name__, message)
+            message = '%s: %s' % (clazz.__name__, message)
 
         # Give the error message to the parent constructor.
         RuntimeError.__init__(self, message)
@@ -508,8 +508,8 @@ class CompilerState (object):
             C{False} otherwise.
         """
         return (
-            "nullfree" in self.shared.get("encoding", "") or
-            "\x00" in self.shared.get("badchars", "")
+            'nullfree' in self.shared.get('encoding', '') or
+            '\x00' in self.shared.get('badchars', '')
         )
 
 #-----------------------------------------------------------------------------#
@@ -588,8 +588,8 @@ class Shellcode (object):
     #
     # Users may define their own values as well.
     #
-    arch      = "any"
-    os        = "any"
+    arch      = 'any'
+    os        = 'any'
     requires  = ()
     provides  = ()
     qualities = ()
@@ -744,11 +744,11 @@ class Shellcode (object):
         @return: There is no return value.
             Warnings are raised if the platforms don't match.
         """
-        if "any" not in (self.arch, other.arch) and self.arch != other.arch:
+        if 'any' not in (self.arch, other.arch) and self.arch != other.arch:
             msg = "Processor architectures don't match: %s and %s"
             msg = msg % (self.arch, other.arch)
             warnings.warn(msg, ShellcodeWarning)
-        if "any" not in (self.os, other.os) and self.os != other.os:
+        if 'any' not in (self.os, other.os) and self.os != other.os:
             msg = "Operating systems don't match: %s and %s"
             msg = msg % (self.os, other.os)
             warnings.warn(msg, ShellcodeWarning)
@@ -895,7 +895,7 @@ class Static (Shellcode):
     __metaclass__ = meta_shellcode_static
 
     # Subclasses MUST define "bytes".
-    bytes = ""
+    bytes = ''
 
     def compile(self, state = None):
         return self.bytes
@@ -917,7 +917,7 @@ class Raw (Static):
     # Don't subclass this class. Also don't add a compile() method.
     __metaclass__= meta_shellcode_raw
 
-    def __init__(self, bytes, arch = "any", os = "any",
+    def __init__(self, bytes, arch = 'any', os = 'any',
                  requires = None,  provides = None,
                  qualities = None, encoding = None):
         """
@@ -1143,12 +1143,12 @@ class Container (Dynamic):
 
         # The dark magic is only for the "encoding" property.
         # Use the normal lookup mechanism for everything else.
-        if name != "encoding":
+        if name != 'encoding':
             return getattribute(name)
 
         # Get the dictionary of instance variables.
         # This excludes the variables defined in the class.
-        instance_vars = object.__getattribute__(self, "__dict__")
+        instance_vars = object.__getattribute__(self, '__dict__')
 
         # If the value is defined as an instance variable,
         # return it unmodified.
@@ -1179,7 +1179,7 @@ class Container (Dynamic):
             encoding = set( meta_canonicalize_tags(value) )
             if encoding:
                 intersect = encoding.intersection_update
-                for child in getattribute("children"):
+                for child in getattribute('children'):
                     intersect( meta_canonicalize_tags(child.encoding) )
                     if not encoding:
                         break
@@ -1254,7 +1254,7 @@ class Container (Dynamic):
         """
         if state is None:
             state = CompilerState()
-        bytes = ""
+        bytes = ''
         for child in self.children:
             bytes += child.compile(state)
         return bytes
@@ -1293,13 +1293,13 @@ class Concatenator (Container):
     # Otherwise return "any".
     @property
     def arch(self):
-        arch = "any"
+        arch = 'any'
         for child in self.children:
-            if child.arch != "any":
-                if arch == "any":
+            if child.arch != 'any':
+                if arch == 'any':
                     arch = child.arch
                 elif child.arch != arch:
-                    arch = "any"
+                    arch = 'any'
                     break
         return arch
 
@@ -1307,13 +1307,13 @@ class Concatenator (Container):
     # Otherwise return "any".
     @property
     def os(self):
-        os = "any"
+        os = 'any'
         for child in self.children:
-            if child.os != "any":
-                if os == "any":
+            if child.os != 'any':
+                if os == 'any':
                     os = child.os
                 elif child.os != os:
-                    os = "any"
+                    os = 'any'
                     break
         return os
 
@@ -1465,7 +1465,7 @@ class Stager (Dynamic):
 #            like this::
 #
 #                def compile(self, state):
-#                    bytes = ""
+#                    bytes = ''
 #
 #                    # ...stuff...
 #
@@ -1538,10 +1538,10 @@ def test():
     # However this check is disabled for base.py only.
     # This test verifies that.
     class TestStaticCompile (Static):
-        bytes == "matanga"
+        bytes == 'matanga'
         def compile(self, state):
-            return "hola manola"
-    assert TestStaticCompile().compile() == "hola manola"
+            return 'hola manola'
+    assert TestStaticCompile().compile() == 'hola manola'
 
     # Raw shouldn't be subclassed.
     try:
@@ -1565,45 +1565,45 @@ def test():
 
     # Test the canonicalization of the metadata in a class.
     class TestCanonicalization(Static):
-        requires = "requires"
-        provides = ["   pro", "VideS", "PRO   "]
-        qualities = "  quali, ties  "
-        encoding = (x for x in ("en", "co", "ding"))
-        bytes = ""
-    assert TestCanonicalization.requires  == ("requires",)
-    assert TestCanonicalization.provides  == ("pro", "vides")
-    assert TestCanonicalization.qualities == ("quali", "ties")
-    assert TestCanonicalization.encoding  == ("co", "ding", "en")
+        requires = 'requires'
+        provides = ['   pro', 'VideS', 'PRO   ']
+        qualities = '  quali, ties  '
+        encoding = (x for x in ('en', 'co', 'ding'))
+        bytes = ''
+    assert TestCanonicalization.requires  == ('requires',)
+    assert TestCanonicalization.provides  == ('pro', 'vides')
+    assert TestCanonicalization.qualities == ('quali', 'ties')
+    assert TestCanonicalization.encoding  == ('co', 'ding', 'en')
 
     # Test editing the metadata in an instance.
     t = TestCanonicalization()
-    t.add_requirement("re")
-    t.remove_requirement("fake")
-    t.remove_requirement("requires")
-    t.add_requirement("quires")
-    assert t.requires == ("quires", "re")
+    t.add_requirement('re')
+    t.remove_requirement('fake')
+    t.remove_requirement('requires')
+    t.add_requirement('quires')
+    assert t.requires == ('quires', 're')
     assert t.requires != TestCanonicalization.requires
-    t.remove_provision("fake")
-    t.add_provision(" PRO VIDES ")
-    t.add_provision("\tPRO\tVIDES\t")
-    t.add_provision("PrO, VideS")
+    t.remove_provision('fake')
+    t.add_provision(' PRO VIDES ')
+    t.add_provision('\tPRO\tVIDES\t')
+    t.add_provision('PrO, VideS')
     assert t.provides == TestCanonicalization.provides
-    t.remove_provision("pro")
-    t.add_provision("Feature")
-    assert t.provides == ("feature", "vides")
+    t.remove_provision('pro')
+    t.add_provision('Feature')
+    assert t.provides == ('feature', 'vides')
     assert t.provides != TestCanonicalization.provides
-    t.add_quality("ti")
-    t.remove_quality("fake")
-    t.add_quality("es")
-    t.remove_quality("ties")
-    assert t.qualities == ("es", "quali", "ti")
+    t.add_quality('ti')
+    t.remove_quality('fake')
+    t.add_quality('es')
+    t.remove_quality('ties')
+    assert t.qualities == ('es', 'quali', 'ti')
     assert t.qualities != TestCanonicalization.qualities
-    t.add_encoding("EN")
-    t.add_encoding("  co  ")
-    t.add_encoding("\tDiNg\t")
-    t.add_encoding(" enco  di  ")
-    t.add_encoding(" n, g ")
-    assert t.encoding == ("co", "di", "ding", "en", "enco", "g", "n")
+    t.add_encoding('EN')
+    t.add_encoding('  co  ')
+    t.add_encoding('\tDiNg\t')
+    t.add_encoding(' enco  di  ')
+    t.add_encoding(' n, g ')
+    assert t.encoding == ('co', 'di', 'ding', 'en', 'enco', 'g', 'n')
     assert t.encoding != TestCanonicalization.encoding
 
     # Test encoding inheritance for Container shellcodes.
@@ -1634,61 +1634,61 @@ def test():
 
     # Test the platform metadata.
     class TestArchAny(Static):
-        encoding = "unicode, nullfree"
-        bytes = "TestArchAny"
-    TestArchAny.arch = "any"
-    TestArchAny.os = "windows"
+        encoding = 'unicode, nullfree'
+        bytes = 'TestArchAny'
+    TestArchAny.arch = 'any'
+    TestArchAny.os = 'windows'
     class TestOsAny(Static):
-        encoding = "unicode, nullfree"
-        bytes = "TestOsAny"
-    TestOsAny.arch = "x86"
-    TestOsAny.os = "any"
+        encoding = 'unicode, nullfree'
+        bytes = 'TestOsAny'
+    TestOsAny.arch = 'x86'
+    TestOsAny.os = 'any'
     class TestArchOsAny(Static):
-        encoding = "nullfree"
-        bytes = "TestArchOsAny"
-    TestArchOsAny.arch = "any"
-    TestArchOsAny.os = "any"
+        encoding = 'nullfree'
+        bytes = 'TestArchOsAny'
+    TestArchOsAny.arch = 'any'
+    TestArchOsAny.os = 'any'
     class TestArchOsSomething(Static):
-        encoding = "ascii, nullfree"
-        bytes = "TestArchOsSomething"
-    TestArchOsSomething.arch = "x86"
-    TestArchOsSomething.os = "windows"
+        encoding = 'ascii, nullfree'
+        bytes = 'TestArchOsSomething'
+    TestArchOsSomething.arch = 'x86'
+    TestArchOsSomething.os = 'windows'
     class TestArchIncompatible(Static):
-        encoding = "nullfree"
-        bytes = "TestArchIncompatible"
-    TestArchIncompatible.arch = "ppc"
-    TestArchIncompatible.os = "any"
+        encoding = 'nullfree'
+        bytes = 'TestArchIncompatible'
+    TestArchIncompatible.arch = 'ppc'
+    TestArchIncompatible.os = 'any'
     class TestOsIncompatible(Static):
-        encoding = "ascii"
-        bytes = "TestOsIncompatible"
-    TestOsIncompatible.arch = "any"
-    TestOsIncompatible.os = "osx"
+        encoding = 'ascii'
+        bytes = 'TestOsIncompatible'
+    TestOsIncompatible.arch = 'any'
+    TestOsIncompatible.os = 'osx'
     class TestArchOsIncompatible(Static):
-        encoding = "nullfree"
-        bytes = "TestArchOsIncompatible"
-    TestArchOsIncompatible.arch = "ppc"
-    TestArchOsIncompatible.os = "osx"
+        encoding = 'nullfree'
+        bytes = 'TestArchOsIncompatible'
+    TestArchOsIncompatible.arch = 'ppc'
+    TestArchOsIncompatible.os = 'osx'
     with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
+        warnings.simplefilter('always')
         test1  = TestArchAny() + TestOsAny() + TestArchOsAny()
         test1 += TestArchOsSomething()
         test2  = TestArchIncompatible() + TestOsIncompatible()
         test2 += TestArchOsIncompatible()
         assert not w
     with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
+        warnings.simplefilter('always')
         test3 = test1 + test2
         assert w
     with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
+        warnings.simplefilter('always')
         TestArchAny() + TestOsIncompatible()
         assert w
     with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
+        warnings.simplefilter('always')
         TestOsAny() + TestArchIncompatible()
         assert w
     with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
+        warnings.simplefilter('always')
         TestArchOsSomething() + TestArchOsIncompatible()
         assert w
 
@@ -1776,18 +1776,18 @@ def test():
         * Bytes:     5465737441726368...6d70617469626c65
 
 """)
-    ##open("1.txt","wb").write(capture.getvalue())  # for manually checking
-    ##open("2.txt","wb").write(expected)            # the differences
+    ##open('1.txt','wb').write(capture.getvalue())  # for manually checking
+    ##open('2.txt','wb').write(expected)            # the differences
     assert capture.getvalue() == expected
     test3.compile()
     assert test3.bytes == (
-        "TestArchAny"
-        "TestOsAny"
-        "TestArchOsAny"
-        "TestArchOsSomething"
-        "TestArchIncompatible"
-        "TestOsIncompatible"
-        "TestArchOsIncompatible"
+        'TestArchAny'
+        'TestOsAny'
+        'TestArchOsAny'
+        'TestArchOsSomething'
+        'TestArchIncompatible'
+        'TestOsIncompatible'
+        'TestArchOsIncompatible'
     )
     ##print_shellcode_tree( test3 ) # For updating the test...
     ##sys.exit(0)                   # For updating the test...
@@ -1882,8 +1882,8 @@ def test():
         * Bytes:     5465737441726368...6d70617469626c65
 
 """)
-    ##open("1.txt","wb").write(capture.getvalue())  # for manually checking
-    ##open("2.txt","wb").write(expected)            # the differences
+    ##open('1.txt','wb').write(capture.getvalue())  # for manually checking
+    ##open('2.txt','wb').write(expected)            # the differences
     assert capture.getvalue() == expected
 
     # Test warnings when concatenating more than once.
@@ -1891,15 +1891,15 @@ def test():
     test2 = TestArchOsAny()
     test3 = test1 + test2
     with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
+        warnings.simplefilter('always')
         test4 = test1 + test2
         assert w        # fails because test3 was the parent
     with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
+        warnings.simplefilter('always')
         test3 += test2
         assert w        # fails because test4 was the parent
     with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
+        warnings.simplefilter('always')
         del test3
         test4 = TestArchOsAny() + TestArchOsAny()
         test4 += test2
@@ -1909,7 +1909,7 @@ def test():
     import random
     class TestBytecodeCache(Dynamic):
         def compile(self, state):
-            return "".join((chr(random.randint(0, 255))
+            return ''.join((chr(random.randint(0, 255))
                             for x in xrange(random.randint(1, 16)) ))
     test_rnd = TestBytecodeCache()
     assert test_rnd.bytes == test_rnd.bytes

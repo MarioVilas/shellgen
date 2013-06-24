@@ -37,22 +37,22 @@ import struct
 __all__ = [
 
     # Generic entrypoint.
-    "export",
-    "exporter",
-    "exporters",
+    'export',
+    'exporter',
+    'exporters',
 
     # Exporter functions.
-    "as_raw_binary",
-    "as_base64",
-    "as_hexadecimal",
-    "as_python_source",
-    "as_ruby_source",
-    "as_perl_source",
-    "as_php_source",
-    "as_javascript_source",
-    "as_vbscript_source",
-    "as_c_source",
-    "as_cpp_source",
+    'as_raw_binary',
+    'as_base64',
+    'as_hexadecimal',
+    'as_python_source',
+    'as_ruby_source',
+    'as_perl_source',
+    'as_php_source',
+    'as_javascript_source',
+    'as_vbscript_source',
+    'as_c_source',
+    'as_cpp_source',
 ]
 
 #-----------------------------------------------------------------------------#
@@ -66,11 +66,11 @@ def exporter(fn):
     returning.
     """
     def _exporter(shellcode, output):
-        if not hasattr(shellcode, "bytes"):
+        if not hasattr(shellcode, 'bytes'):
             raise TypeError(
                 "Expected Shellcode, got %s instead" % type(shellcode))
-        if not hasattr(output, "write"):
-            with open(output, "wb") as output:
+        if not hasattr(output, 'write'):
+            with open(output, 'wb') as output:
                 return fn(shellcode, output)
         return fn(shellcode, output)
     return _exporter
@@ -93,7 +93,7 @@ def _generic_source_exporter(shellcode, output,
 
     # Convert the bytecode into an array of numeric chars.
     bytes = shellcode.bytes
-    chars = struct.unpack("B" * len(bytes), bytes)
+    chars = struct.unpack('B' * len(bytes), bytes)
 
     # Add the bytecode size to the prologue, if supported.
     try:
@@ -182,7 +182,7 @@ def as_base64(shellcode, output):
         platforms. For example on Windows an extra C{\r} will be prepended to
         each C{\n} character by Python without this function knowing about it.
     """
-    bytes = shellcode.bytes.encode("base64")
+    bytes = shellcode.bytes.encode('base64')
     output.write(bytes)
     return len(bytes)
 
@@ -212,11 +212,6 @@ def as_hexadecimal(shellcode, output):
         line_fmt = "%s\n",
         epilogue = "",
     )
-    #bytes = shellcode.bytes
-    #chars = struct.unpack("B" * len(bytes), bytes)
-    #hexa  = " ".join("%.2X" % c for c in chars) + "\n"
-    #output.write(hexa)
-    #return len(hexa)
 
 @exporter
 def as_python_source(shellcode, output):
@@ -436,21 +431,21 @@ def as_cpp_source(shellcode, output):
 
 # Map of output formats to their corresponding exporter functions.
 exporters = {
-    "raw":        as_raw_binary,
-    "base64":     as_base64,
-    "hex":        as_hexadecimal,
-    "python":     as_python_source,
-    "ruby":       as_ruby_source,
-    "perl":       as_perl_source,
-    "php":        as_php_source,
-    "javascript": as_javascript_source,
-    "vbscript":   as_vbscript_source,
-    "c":          as_c_source,
-    "c++":        as_cpp_source,
+    'raw':        as_raw_binary,
+    'base64':     as_base64,
+    'hex':        as_hexadecimal,
+    'python':     as_python_source,
+    'ruby':       as_ruby_source,
+    'perl':       as_perl_source,
+    'php':        as_php_source,
+    'javascript': as_javascript_source,
+    'vbscript':   as_vbscript_source,
+    'c':          as_c_source,
+    'c++':        as_cpp_source,
 }
 
 # Parameterized exporter functions entry point.
-def export(shellcode, output, format = "python"):
+def export(shellcode, output, format = 'python'):
     """
     Export the given shellcode with the desired format.
 
@@ -470,17 +465,17 @@ def export(shellcode, output, format = "python"):
     @type  format: str
     @param format: Desired output format.
         Must be one of the following:
-         - C{"raw"}: Raw binary file with no format.
-         - C{"base64"}: Base64 encoded file.
-         - C{"hex"}: Hexadecimal text file.
-         - C{"Python"}: Python source code.
-         - C{"Ruby"}: Ruby source code.
-         - C{"Perl"}: Perl source code.
-         - C{"PHP"}: PHP source code.
-         - C{"JavaScript"}: JavaScript source code.
-         - C{"VBScript"}: VBScript source code.
-         - C{"C"}: C source code.
-         - C{"C++"}: C++ source code.
+         - C{'raw'}: Raw binary file with no format.
+         - C{'base64'}: Base64 encoded file.
+         - C{'hex'}: Hexadecimal text file.
+         - C{'Python'}: Python source code.
+         - C{'Ruby'}: Ruby source code.
+         - C{'Perl'}: Perl source code.
+         - C{'PHP'}: PHP source code.
+         - C{'JavaScript'}: JavaScript source code.
+         - C{'VBScript'}: VBScript source code.
+         - C{'C'}: C source code.
+         - C{'C++'}: C++ source code.
 
     @rtype:  int
     @return: Number of bytes written.
@@ -499,35 +494,57 @@ def export(shellcode, output, format = "python"):
 def test():
     "Unit test."
 
+    # True to write out shellcode samples to disk.
+    WRITE = False
+    #WRITE = True
+
     from .base import Static
 
     shellcode_size = 256
 
     class TestShellcode(Static):
-        bytes = struct.pack("B"*shellcode_size,*range(shellcode_size))
+        bytes = struct.pack('B'*shellcode_size,*range(shellcode_size))
 
     shellcode = TestShellcode()
 
     try:
-        export(None, "test_export.dummy", "raw")
+        export(None, 'test_export.dummy', 'raw')
         assert False
     except TypeError:
         pass
 
     try:
-        export(shellcode, "test_export.dummy", "Dummy")
+        export(shellcode, 'test_export.dummy', 'Dummy')
         assert False
     except ValueError:
         pass
 
-    export(shellcode, "test_export.bin", "raw\n")
-    export(shellcode, "test_export.txt", " HEX ")
-    export(shellcode, "test_export.b64", "base64")
-    export(shellcode, "test_export.py",  "Python")
-    export(shellcode, "test_export.rb",  "Ruby")
-    export(shellcode, "test_export.pl",  "Perl")
-    export(shellcode, "test_export.php", "PHP")
-    export(shellcode, "test_export.js",  "JavaScript")
-    export(shellcode, "test_export.vbs", "VBScript")
-    export(shellcode, "test_export.c",   "C")
-    export(shellcode, "test_export.cpp", "C++")
+    targets = (
+        ('test_export.bin', 'raw\n'),
+        ('test_export.txt', ' HEX '),
+        ('test_export.b64', 'base64'),
+        ('test_export.py',  'Python'),
+        ('test_export.rb',  'Ruby'),
+        ('test_export.pl',  'Perl'),
+        ('test_export.php', 'PHP'),
+        ('test_export.js',  'JavaScript'),
+        ('test_export.vbs', 'VBScript'),
+        ('test_export.c',   'C'),
+        ('test_export.cpp', 'C++'),
+    )
+
+    if WRITE:
+        for name, format in targets:
+            try:
+                export(shellcode, name, format)
+            except Exception:
+                print "Export failed, format: %s" % format
+                raise
+    else:
+        from StringIO import StringIO
+        for _, format in targets:
+            try:
+                export(shellcode, StringIO(), format)
+            except Exception:
+                print "Export failed, format: %s" % format
+                raise

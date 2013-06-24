@@ -64,16 +64,16 @@ if not here:
     here = curdir
 here = abspath(here)
 
-# Automatically find all packages.
-packages = []
-for root, folders, files in walk(here):
-    if "__init__.py" in files:
+# Automatically find all subpackages.
+packages = ['shellgen']
+for root, folders, files in walk(join(here, 'shellgen')):
+    if '__init__.py' in files:
         module = root[len(here):]
         if module.startswith(sep):
             module = module[len(sep):]
         if module.endswith(sep):
             module = module[:-len(sep)]
-        module = module.replace(sep, ".")
+        module = module.replace(sep, '.')
         packages.append(module)
 packages.sort()
 metadata['packages'] = packages
