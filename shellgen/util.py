@@ -631,25 +631,21 @@ def load_bytecode_from_source(input):
             return _load_bytecode_from_source(input)
     return _load_bytecode_from_source(input)
 
-_re_is_line   = re.compile('^[^"]*"[^"]+"[^"]*\\n$')
-_re_escape    = re.compile('\\\\x([0-9A-Fa-f][0-9A-Fa-f])')
-_re_urlencode = re.compile('\\%([0-9A-Fa-f][0-9A-Fa-f])')
+_re_is_line    = re.compile('^([^"]*"[^"]+"[^"]*)|([^\']*\'[^\']+\'[^\']*)\\n$')
+_re_parse_line = re.compile('(?:\\\\x|\\%)([0-9A-Fa-f][0-9A-Fa-f])')
 
 def _load_bytecode_from_source(input):
 
     # Load the regular expressions as local variables,
     # since we're using them in a loop.
-    re_is_line   = _re_is_line
-    re_escape    = _re_escape
-    re_urlencode = _re_urlencode
+    re_is_line    = _re_is_line
+    re_parse_line = _re_parse_line
 
     # We'll accumulate the hexadecimal characters here.
     hexa = []
 
-    # Flags to signal errors during parsing.
-    bad_line        = False
-    found_escape    = False
-    found_urlencode = False
+    # Flag to signal errors during parsing.
+    parse_warning = False
 
     # For each line of text in the input file...
     for line in input.readlines():
@@ -657,34 +653,26 @@ def _load_bytecode_from_source(input):
         # Skip lines that don't contain bytecode.
         if re_is_line.match(line):
 
-            # Extract escaped char sequences.
-            if '\\x' in line:
-                found_escape = True
-                hexa.extend( re_escape.findall(line) )
+            # Extract hexadecimal sequences.
+            sequence = re_parse_line.findall(line)
+            if sequence:
+                hexa.extend(sequence)
 
-            # Extract URL encoded sequences.
-            elif '%' in line:
-                found_urlencode = True
-                hexa.extend( re_urlencode.findall(line) )
+            # Flag parsing errors.
+            elif '\\x' in line or '%' in line:
+                parse_warning = True
 
-            # Flag the error if we found neither.
-            else:
-                bad_line = True
-
-    # Show warnings if we had parsing errors.
-    if bad_line:
-        warnings.warn("Bad source code line found, possible load error?")
-    if found_escape and found_urlencode:
-        warnings.warn("Found both urlencoded and escaped strings,"
-                      " possible load error?")
+    # Show a warning if we had parsing errors.
+    if parse_warning:
+        warnings.warn("Source code layout was changed, possible load errors!")
 
     # Raise an exception if no bytecode was extracted.
     if not hexa:
-        raise IOError("No bytecode found, possible load error?")
+        raise IOError("Load error, no bytecode found")
 
     # Pack the bytecode and return it.
     hexdump = [int(x, 16) for x in hexa]
-    return struct.pack('B' * len(hexdump), hexdump)
+    return struct.pack('B' * len(hexdump), *hexdump)
 
 #-----------------------------------------------------------------------------#
 
@@ -719,7 +707,7 @@ def load_bytecode_from_dump(input):
             return _load_bytecode_from_dump(input)
     return _load_bytecode_from_dump(input)
 
-_re_is_hexa  = re.compile('^(\\w?[0-9A-Fa-f][0-9A-Fa-f]\\w?)+$')
+_re_is_hexa  = re.compile('^([ \\t\\r\\n]?[0-9A-Fa-f][0-9A-Fa-f][ \\t\\r\\n]?)+$')
 _re_get_hexa = re.compile('[0-9A-Fa-f]')
 _re_is_b64   = re.compile('^[A-Za-z0-9\\+\\/\\n]+\\=?\\=?\\n?$')
 
@@ -732,7 +720,7 @@ def _load_bytecode_from_dump(input):
     if _re_is_hexa.match(data):
         hexstr  = ''.join(_re_get_hexa.findall(data))
         hexdump = [ int(hexstr[i:i+2], 16) for i in xrange(0, len(hexstr), 2) ]
-        return struct.pack('B' * len(hexdump), hexdump)
+        return struct.pack('B' * len(hexdump), *hexdump)
 
     # If it's base64 encoded data, decode and return it.
     if _re_is_b64.match(data):
@@ -945,24 +933,25 @@ def test():
     test_uses_stack     = TestShellcodeUsesStack()
     test_stack_balanced = TestShellcodeStackBalanced()
     test_no_stack       = TestShellcodeNoStack()
-    assert not is_stack_balanced(test_uses_stack)
-    assert is_stack_balanced(test_stack_balanced)
-    assert is_stack_balanced(test_no_stack)
-    assert is_stack_balanced(test_stack_balanced + test_stack_balanced)
-    assert is_stack_balanced(test_no_stack + test_no_stack)
-    assert is_stack_balanced(test_stack_balanced + test_no_stack)
-    assert is_stack_balanced(test_no_stack + test_stack_balanced)
-    assert is_stack_balanced(test_no_stack + test_stack_balanced + test_no_stack)
-    assert is_stack_balanced(test_stack_balanced + test_no_stack + test_stack_balanced)
-    assert not is_stack_balanced(test_uses_stack + test_uses_stack)
-    assert not is_stack_balanced(test_uses_stack + test_stack_balanced)
-    assert not is_stack_balanced(test_stack_balanced + test_uses_stack)
-    assert not is_stack_balanced(test_uses_stack + test_no_stack)
-    assert not is_stack_balanced(test_no_stack + test_uses_stack)
-    assert not is_stack_balanced(test_stack_balanced + test_uses_stack + test_stack_balanced)
-    assert not is_stack_balanced(test_no_stack + test_uses_stack + test_no_stack)
-    assert not is_stack_balanced(test_stack_balanced + test_uses_stack + test_no_stack)
-    assert not is_stack_balanced(test_no_stack + test_uses_stack + test_stack_balanced)
+    with warnings.catch_warnings(record=True):
+        assert not is_stack_balanced(test_uses_stack)
+        assert is_stack_balanced(test_stack_balanced)
+        assert is_stack_balanced(test_no_stack)
+        assert is_stack_balanced(test_stack_balanced + test_stack_balanced)
+        assert is_stack_balanced(test_no_stack + test_no_stack)
+        assert is_stack_balanced(test_stack_balanced + test_no_stack)
+        assert is_stack_balanced(test_no_stack + test_stack_balanced)
+        assert is_stack_balanced(test_no_stack + test_stack_balanced + test_no_stack)
+        assert is_stack_balanced(test_stack_balanced + test_no_stack + test_stack_balanced)
+        assert not is_stack_balanced(test_uses_stack + test_uses_stack)
+        assert not is_stack_balanced(test_uses_stack + test_stack_balanced)
+        assert not is_stack_balanced(test_stack_balanced + test_uses_stack)
+        assert not is_stack_balanced(test_uses_stack + test_no_stack)
+        assert not is_stack_balanced(test_no_stack + test_uses_stack)
+        assert not is_stack_balanced(test_stack_balanced + test_uses_stack + test_stack_balanced)
+        assert not is_stack_balanced(test_no_stack + test_uses_stack + test_no_stack)
+        assert not is_stack_balanced(test_stack_balanced + test_uses_stack + test_no_stack)
+        assert not is_stack_balanced(test_no_stack + test_uses_stack + test_stack_balanced)
 
     # Test load_bytecode_from_source() and load_bytecode_from_dump().
     from StringIO import StringIO
@@ -976,10 +965,12 @@ def test():
         return fd.getvalue()
     def test_dump(fmt):
         fd = StringIO(export_to_str(fmt))
-        return load_bytecode_from_dump(fd) == test_export.bytes
+        bytes = load_bytecode_from_dump(fd)
+        return bytes == test_export.bytes
     def test_src(fmt):
         fd = StringIO(export_to_str(fmt))
-        return load_bytecode_from_source(fd) == test_export.bytes
+        bytes = load_bytecode_from_source(fd)
+        return bytes == test_export.bytes
     assert test_dump('raw')
     assert test_dump('hex')
     assert test_dump('base64')
