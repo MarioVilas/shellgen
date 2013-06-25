@@ -246,8 +246,8 @@ def chmod(arch, os, **options):
 
 def xor_encode(payload, bad_chars = "\0\r\n\x1a\"'`%,;:."):
     """
-    Encode the payload and prepend a XOR-based decoder to B{bypass character
-    filters}.
+    Encode the payload and prepend a XOR-based decoder to bypass character
+    filters.
 
     @type  payload: L{Shellcode}
     @param payload: Payload to encode.
@@ -278,8 +278,8 @@ def xor_encode(payload, bad_chars = "\0\r\n\x1a\"'`%,;:."):
 def ascii_encode(payload, allow_upper = True,
                           allow_lower = True):
     """
-    Encode the payload and prepend a decoder so the payload uses only standard
-    B{ASCII (7-bit)} characters.
+    Encode the payload and prepend a decoder so the payload
+    uses only standard ASCII (7-bit) characters.
 
     @type  payload: L{Shellcode}
     @param payload: Payload to encode.
@@ -311,8 +311,8 @@ def ascii_encode(payload, allow_upper = True,
 def alpha_encode(payload, allow_upper = True,
                           allow_lower = True):
     """
-    Encode the payload and prepend a decoder so the payload uses only
-    B{alphanumeric} characters.
+    Encode the payload and prepend a decoder so the payload
+    uses only alphanumeric characters.
 
     @type  payload: L{Shellcode}
     @param payload: Payload to encode.
@@ -345,8 +345,8 @@ def unicode_encode(payload, allow_upper = True,
                             allow_lower = True,
                             allow_null  = False):
     """
-    Encode the payload and prepend a decoder so the payload can B{survive
-    ANSI to WIDECHAR conversion}.
+    Encode the payload and prepend a decoder so the payload
+    can survive ANSI to WIDECHAR conversion.
 
     @type  payload: L{Shellcode}
     @param payload: Payload to encode.

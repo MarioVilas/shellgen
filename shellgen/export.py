@@ -95,9 +95,9 @@ def _generic_source_exporter(shellcode, output,
     bytes = shellcode.bytes
     chars = struct.unpack('B' * len(bytes), bytes)
 
-    # Add the bytecode size to the prologue, if supported.
+    # Add the bytecode name and size to the prologue, if supported.
     try:
-        prologue %= len(bytes)
+        prologue %= (shellcode.name, len(bytes))
     except Exception:
         pass
 
@@ -233,7 +233,7 @@ def as_python_source(shellcode, output):
     """
     return _generic_source_exporter(
         shellcode, output,
-        prologue = "# %d bytes\nshellcode = (\n",
+        prologue = "# %s (%d bytes)\nshellcode = (\n",
         char_fmt = "\\x%.2x",
         line_fmt = "    \"%s\"\n",
         epilogue = ")\n",
@@ -259,7 +259,7 @@ def as_ruby_source(shellcode, output):
     """
     return _generic_source_exporter(
         shellcode, output,
-        prologue = "# %d bytes\nshellcode = \\\n",
+        prologue = "# %s (%d bytes)\nshellcode = \\\n",
         char_fmt = "\\x%.2x",
         line_fmt = "  \"%s\"\\\n",
         last_fmt = "  \"%s\"\n",
@@ -286,7 +286,7 @@ def as_perl_source(shellcode, output):
     """
     return _generic_source_exporter(
         shellcode, output,
-        prologue = "# %d bytes\nmy $shellcode =\n",
+        prologue = "# %s (%d bytes)\nmy $shellcode =\n",
         char_fmt = "\\x%.2x",
         line_fmt = "\"%s\" .\n",
         last_fmt = "\"%s\";\n",
@@ -313,7 +313,7 @@ def as_php_source(shellcode, output):
     """
     return _generic_source_exporter(
         shellcode, output,
-        prologue  = "<?php\n# %d bytes\n",
+        prologue  = "<?php\n# %s (%d bytes)\n",
         char_fmt  = "\\x%.2x",
         first_fmt = "$shellcode = '%s'\n",
         line_fmt  = "           . '%s'\n",
@@ -341,7 +341,7 @@ def as_javascript_source(shellcode, output):
     """
     return _generic_source_exporter(
         shellcode, output,
-        prologue  = "// %d bytes\nvar shellcode = unescape(\n",
+        prologue  = "// %s (%d bytes)\nvar shellcode = unescape(\n",
         char_fmt  = "%%%.2X",
         line_fmt  = "  '%s' +\n",
         last_fmt  = "  '%s');\n",
@@ -368,7 +368,7 @@ def as_vbscript_source(shellcode, output):
     """
     return _generic_source_exporter(
         shellcode, output,
-        prologue = "' %d bytes\nDim shellcode\nshellcode = Unescape(\n",
+        prologue = "' %s (%d bytes)\nDim shellcode\nshellcode = Unescape(\n",
         char_fmt = "%%%.2X",
         line_fmt = "  \"%s\" +\n",
         last_fmt = "  \"%s\")\n",
@@ -395,7 +395,7 @@ def as_c_source(shellcode, output):
     """
     return _generic_source_exporter(
         shellcode, output,
-        prologue = "/* %d bytes */\nchar shellcode[] = {\n",
+        prologue = "/* %s (%d bytes) */\nchar shellcode[] = {\n",
         char_fmt = "\\x%.2x",
         line_fmt = "    \"%s\"\n",
         epilogue = "};\n",
@@ -421,7 +421,7 @@ def as_cpp_source(shellcode, output):
     """
     return _generic_source_exporter(
         shellcode, output,
-        prologue = "// %d bytes\nchar shellcode[] = {\n",
+        prologue = "// %s (%d bytes)\nchar shellcode[] = {\n",
         char_fmt = "\\x%.2x",
         line_fmt = "    \"%s\"\n",
         epilogue = "};\n",
