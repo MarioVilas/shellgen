@@ -31,6 +31,8 @@ __all__ = ["Breakpoint", "While1"]
 #-----------------------------------------------------------------------------#
 
 class Breakpoint (Dynamic):
+    "Trigger a software breakpoint interruption."
+
     qualities = "stack_balanced"
     encoding  = "nullfree"
 
@@ -41,6 +43,8 @@ class Breakpoint (Dynamic):
         return "\xcc" * self.size
 
 class While1 (Static):
+    "Infinite loop."
+
     qualities = "stack_balanced"
     encoding  = "nullfree"
 

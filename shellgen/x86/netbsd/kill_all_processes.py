@@ -29,6 +29,7 @@ __all__ = ["KillAllProcesses"]
 from shellgen import Static
 
 class KillAllProcesses (Static):
+    "NetBSD/x86 - kills all processes in the system."
     bytes = (
 
         # int sys_kill(int pid, int signum);

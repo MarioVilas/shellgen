@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 ###############################################################################
-## Execute any command in IRIX/MIPS                                          ##
+## Execute any command on IRIX/MIPS                                          ##
 ## Shellcode for ShellGen                                                    ##
 ###############################################################################
 
@@ -28,9 +28,14 @@ __all__ = ["Execute"]
 
 from shellgen import Dynamic
 
-# Based on anonymous code found on the Internet:
-# http://www.shell-storm.org/shellcode/files/shellcode-139.php
 class Execute (Dynamic):
+    """
+    Execute any command on IRIX/MIPS.
+
+    Based on anonymous code found on the Internet:
+    U{http://www.shell-storm.org/shellcode/files/shellcode-139.php}
+    """
+
     qualities = ("payload", "no_stack")
     encoding  = "term_null"
 

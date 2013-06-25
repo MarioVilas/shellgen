@@ -21,7 +21,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA 02110-1301, USA.
 
-"Nop sled."
+"NOP sled."
 
 from __future__ import absolute_import
 from ..base import Dynamic, Decorator
@@ -31,6 +31,12 @@ __all__ = ["AbstractNop", "AbstractPadder"]
 #-----------------------------------------------------------------------------#
 
 class AbstractNop (Dynamic):
+    """
+    NOP sleds provide a buffer where execution can be diverted at any point
+    in it. By prepending a shellcode with a NOP sled, you no longer need to
+    know the exact address where it starts.
+    """
+
     qualities = "no_stack, stack_balanced, preserve_registers"
 
     # Subclasses define a string with the bytecode for a NOP instruction.
@@ -59,6 +65,11 @@ class AbstractNop (Dynamic):
 #-----------------------------------------------------------------------------#
 
 class AbstractPadder (Decorator):
+    """
+    Pads the buffer with NOP instructions, either before or after a shellcode.
+    Useful when the vulnerable program expects a minimum amount of bytes in the
+    buffer.
+    """
 
     @property
     def Nop(self):

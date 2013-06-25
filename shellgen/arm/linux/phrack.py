@@ -30,9 +30,13 @@ from shellgen import Static
 
 #-----------------------------------------------------------------------------#
 
-# Example shellcode from Phrack #66
-# http://www.phrack.org/issues.html?issue=66&id=12
 class Phrack66 (Static):
+    """
+    Example shellcode from Phrack #66.
+
+    U{http://www.phrack.org/issues.html?issue=66&id=12}
+    """
+
     qualities = "payload"
     encoding  = "nullfree, ascii, alpha"
 

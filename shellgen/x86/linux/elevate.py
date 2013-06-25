@@ -29,6 +29,8 @@ __all__ = ["Elevate"]
 from shellgen import Static
 
 class Elevate (Static):
+    "Recover root privileges by calling setreuid(0, 0) on Linux/x86."
+
     provides  = "root"
     qualities = "stack_balanced"
 

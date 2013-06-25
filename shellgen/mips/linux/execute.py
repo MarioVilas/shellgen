@@ -28,9 +28,14 @@ __all__ = ["Execute"]
 
 from shellgen import Dynamic
 
-# Based on anonymous code found on the Internet
-# http://www.shell-storm.org/shellcode/files/shellcode-141.php
 class Execute (Dynamic):
+    """
+    Execute any command on Linux/MIPS.
+
+    Based on anonymous code found on the Internet
+    U{http://www.shell-storm.org/shellcode/files/shellcode-141.php}
+    """
+
     qualities = ("payload", "no_stack")
     encoding  = "term_null"
 

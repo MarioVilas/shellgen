@@ -28,9 +28,14 @@ __all__ = ["DropSuidShell"]
 
 from shellgen import Static
 
-# Based on original code by anonymous author
-# http://www.shell-storm.org/shellcode/files/shellcode-540.php
 class DropSuidShell (Static):
+    """
+    Fork and drop a suid shell in /tmp for Linux/x86.
+
+    Based on anonymous code found on the Internet:
+    U{http://www.shell-storm.org/shellcode/files/shellcode-540.php}
+    """
+
     provides  = "root"
     qualities = ("payload", "stack_balanced")
 

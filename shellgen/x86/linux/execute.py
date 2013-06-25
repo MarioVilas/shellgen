@@ -30,6 +30,12 @@ __all__ = ["Execute"]
 from shellgen import Dynamic
 
 class Execute (Dynamic):
+    """
+    Execute any command in Linux/x86.
+
+    Based on original code by Sergio 'shadown' Alvarez (shadown@gmail.com).
+    """
+
     qualities = "payload"
     encoding  = "term_null"
 

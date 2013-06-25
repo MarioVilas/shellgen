@@ -29,6 +29,8 @@ __all__ = ["Exit"]
 from shellgen import Static
 
 class Exit (Static):
+    "Kill the current process on Linux/x86."
+
     qualities = ("payload", "stack_balanced")
     encoding  = "nullfree"
 

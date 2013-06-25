@@ -35,6 +35,22 @@ __all__ = ["SubSP", "AllocaProbe"]
 
 # Stack pointer adjustment.
 class SubSP (Dynamic):
+    """
+    Stack pointer adjustment.
+
+    When exploiting a stack buffer overflow, the stack pointer may be pointing
+    somewhere within our shellcode. To avoid overwriting ourselves when using
+    the stack, we need to adjust the stack pointer first.
+
+    This shellcode tries to use the shortest variant of the C{SUB RSP, imm}
+    instruction. It also tries to avoid null characters when possible.
+
+    Since it's not possible to have a 64-bit immediate value in an arithmetic
+    operation, the shellcode may use C{RAX} and/or C{RDX} for storage. However,
+    you won't need to make stack pointer adjustements larger than C{0xFFFFFFFF}
+    too often, so you probably don't need to worry about it. ;)
+    """
+
     encoding = "nullfree"
 
     def __init__(self, offset):

@@ -34,8 +34,9 @@ __all__ = ["GetPC", "GetPC_Classic, ""GetPC_Alt", "GetPC_FPU", "GetPC_Wrapper"]
 
 #-----------------------------------------------------------------------------#
 
-# Randomly pick one of the GetPC variants found in this file.
 class GetPC (Dynamic):
+    "Randomly pick one of the GetPC variants defined in this module."
+
     provides  = "pc"
     encoding  = "nullfree"
 
@@ -47,8 +48,9 @@ class GetPC (Dynamic):
 
 #-----------------------------------------------------------------------------#
 
-# Classic GetPC implementation using a jump and a call.
 class GetPC_Classic (Dynamic):
+    "Classic GetPC implementation using a jump and a call."
+
     provides  = "pc"
     encoding  = "nullfree"
 
@@ -126,12 +128,18 @@ class GetPC_Classic (Dynamic):
 
 #-----------------------------------------------------------------------------#
 
-# Alternative GetPC implementation using a call instruction jumping on itself.
-# As far as I know the first to implement this was Gerardo Richarte:
-#     http://archive.cert.uni-stuttgart.de/vuln-dev/2003/06/msg00098.html
-# This optimized version is based on the one published by Skylined:
-#     http://skypher.com/wiki/index.php/Hacking/Shellcode/GetPC
 class GetPC_Alt (Dynamic):
+    """
+    Alternative GetPC implementation.
+    Uses a call instruction that jumps on itself.
+
+    The first public implementation of this technique is from Gerardo Richarte:
+    U{http://archive.cert.uni-stuttgart.de/vuln-dev/2003/06/msg00098.html}
+
+    This optimized version is based on the one published by Skylined:
+    U{http://skypher.com/wiki/index.php/Hacking/Shellcode/GetPC}
+    """
+
     provides  = "pc"
     encoding  = "nullfree"
 
@@ -206,22 +214,28 @@ class GetPC_Alt (Dynamic):
 
 #-----------------------------------------------------------------------------#
 
-# Another alternative GetPC implementation using the FPU state.
-# As far as I know the first to come up with this idea was noir:
-#     http://archive.cert.uni-stuttgart.de/vuln-dev/2003/06/msg00116.html
-# But again the variant I'm using here is based on Skylined's:
-#     http://skypher.com/wiki/index.php/Hacking/Shellcode/GetPC
-#
-# Note: this shellcode may be hard to single-step on because it uses the stack
-# space at negative ESP offsets, which is overwritten by some debuggers.
-#
-# $+0  D9EE       FLDZ                ; Floating point stores $+0 in its environment
-# $+2  D974E4 F4  FSTENV SS:[ESP-0xC] ; Save environment at ESP-0xC; now [ESP] = $+0
-# $+6  59         POP ECX             ; ECX = $+0
-# $+7  83E9 F2    SUB ECX, -10        ; ECX = $+10
-# $+10 ...
-#
 class GetPC_FPU (Dynamic):
+    """
+    Another alternative GetPC implementation using the FPU state.
+
+    The first public record of this idea is from "noir":
+    U{http://archive.cert.uni-stuttgart.de/vuln-dev/2003/06/msg00116.html}
+
+    This optimized version is based on the one published by Skylined:
+    U{http://skypher.com/wiki/index.php/Hacking/Shellcode/GetPC}
+
+    Disassembly::
+        # $+0  D9EE       FLDZ                ; Floating point stores $+0 in its environment
+        # $+2  D974E4 F4  FSTENV SS:[ESP-0xC] ; Save environment at ESP-0xC; now [ESP] = $+0
+        # $+6  59         POP ECX             ; ECX = $+0
+        # $+7  83E9 F2    SUB ECX, -10        ; ECX = $+10
+        # $+10 ...
+
+    @note:
+        This shellcode may be hard to single-step on because it uses the stack
+        space at negative ESP offsets, which is overwritten by some debuggers.
+    """
+
     provides  = "pc"
     encoding  = "nullfree"
 
@@ -277,10 +291,13 @@ class GetPC_FPU (Dynamic):
 
 #-----------------------------------------------------------------------------#
 
-# This one wraps shellcodes by providing them the address of their payload.
-# The child shellcode MUST be stack balanced.
-# Adds 10 bytes to the shellcode.
 class GetPC_Wrapper (Decorator):
+    """
+    This GetPC variant wraps shellcodes by providing them the address of their
+    payload. Adds 10 bytes to the shellcode.
+
+    @warn: The child shellcode MUST be stack balanced.
+    """
     provides  = "pc"
     encoding  = "nullfree"
 

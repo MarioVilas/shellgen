@@ -36,6 +36,8 @@ __all__ = ["NullFreeEncoder"]
 #-----------------------------------------------------------------------------#
 
 class NullFreeEncoder (Encoder):
+    "Null-free encoder for x86 platforms."
+
     encoding  = "nullfree"
     qualities = "stack_balanced"
 
