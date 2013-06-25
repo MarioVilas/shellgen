@@ -22,6 +22,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA 02110-1301, USA.
 
+"Kill all processes in the system."
+
 __all__ = ["KillAllProcesses"]
 
 from shellgen import Static

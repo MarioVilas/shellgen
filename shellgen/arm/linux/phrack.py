@@ -22,6 +22,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA 02110-1301, USA.
 
+"Example shellcode from Phrack #66."
+
 __all__ = ["Phrack66"]
 
 from shellgen import Static

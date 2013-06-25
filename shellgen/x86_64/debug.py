@@ -21,6 +21,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA 02110-1301, USA.
 
+"Various debug shellcodes."
+
 from __future__ import absolute_import
 from ..x86.debug import *
 from ..x86.debug import __all__

@@ -21,6 +21,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA 02110-1301, USA.
 
+"Nop sled."
+
 from __future__ import absolute_import
 from ..x86.nop import *
 from ..x86.nop import __all__

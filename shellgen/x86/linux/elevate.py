@@ -22,6 +22,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA 02110-1301, USA.
 
+"Recover root privileges."
+
 __all__ = ["Elevate"]
 
 from shellgen import Static

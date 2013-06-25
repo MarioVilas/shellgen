@@ -22,6 +22,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA 02110-1301, USA.
 
+"Fork and drop a suid shell."
+
 __all__ = ["DropSuidShell"]
 
 from shellgen import Static
