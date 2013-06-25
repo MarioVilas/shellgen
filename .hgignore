@@ -1,5 +1,6 @@
 ^build/.*$
 ^dist/.*$
+^html/.*$
 ^MANIFEST$
 ^.*\.pyc$
 ^.*\.komodoproject$

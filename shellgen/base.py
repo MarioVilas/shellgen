@@ -400,13 +400,13 @@ class CompilerState (object):
     @type offset: int
     @ivar offset: Current offset in the compiled bytecode.
 
-    @type  current: dict
-    @param current: Current state.
+    @type current: dict
+    @ivar current: Current state.
         This is used by this piece of shellcode to communicate things to
         the next piece, but only to the next piece.
 
-    @type  previous: dict
-    @param previous: Previous state.
+    @type previous: dict
+    @ivar previous: Previous state.
         This is used by the previous piece of shellcode to communicate things
         to this piece, but only to this piece.
 
@@ -435,7 +435,7 @@ class CompilerState (object):
 
         @type  delta: int
         @param delta: Number of compiled bytes in this piece of shellcode.
-            It will be added to L{position}.
+            It will be added to L{offset}.
         """
         self.offset   += delta
         self.previous  = self.current

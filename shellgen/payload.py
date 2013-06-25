@@ -73,11 +73,11 @@ def shell(arch, os, **options):
     @type    connect: str
     @keyword connect: Communication channel.
         Must be one of the following:
-        - C{bind_tcp}: Listen on the given TCP port for incoming connections.
-        - C{reverse_tcp}: Connect back to the given TCP port on this machine.
-        - C{reuse_tcp}: Reuse an existing TCP socket (for network services).
-        - C{none}: Do not use a communication channel (for inetd programs).
-        Defaults to C{bind_tcp}.
+         - C{bind_tcp}: Listen on the given TCP port for incoming connections.
+         - C{reverse_tcp}: Connect back to the given TCP port on this machine.
+         - C{reuse_tcp}: Reuse an existing TCP socket (for network services).
+         - C{none}: Do not use a communication channel (for inetd programs).
+           Defaults to C{bind_tcp}.
 
     @type    address: str
     @keyword address: IP address to bind to (C{bind_tcp}) or connect to

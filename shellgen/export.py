@@ -480,8 +480,8 @@ def export(shellcode, output, format = 'python'):
     @rtype:  int
     @return: Number of bytes written.
         May be inaccurate if the file was not opened in binary mode on certain
-        platforms. For example on Windows an extra C{\r} will be prepended to
-        each C{\n} character by Python without this function knowing about it.
+        platforms. For example on Windows an extra C{\\r} will be prepended to
+        each C{\\n} character by Python without this function knowing about it.
     """
     try:
         function = exporters[ format.strip().lower() ]
