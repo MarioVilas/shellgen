@@ -24,11 +24,11 @@
 
 "Fork and drop a suid shell."
 
-__all__ = ["DropSuidShell"]
+__all__ = ["SuidShell"]
 
 from shellgen import Static
 
-class DropSuidShell (Static):
+class SuidShell (Static):
     """
     Fork and drop a suid shell in /tmp for Linux/x86.
 
