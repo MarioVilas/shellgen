@@ -43,6 +43,8 @@ class BindShell (Static):
     qualities = "payload"
     encoding  = "nullfree"
 
+    port = 6969
+
     # As found in the source code.
     # I'm assuming Intel byte order, but no idea until this is tested!
     longs = (

