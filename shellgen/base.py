@@ -1576,6 +1576,7 @@ class Stager (Dynamic):
             raise NotImplementedError(msg)
         stages = [next_stage]
         stages.extend( next_stage.stages )
+        return stages
 
     def compile(self, state):
         raise NotImplementedError(
