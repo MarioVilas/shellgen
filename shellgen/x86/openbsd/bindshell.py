@@ -43,6 +43,7 @@ class BindShell (Static):
     qualities = "payload"
     encoding  = "nullfree"
 
+    address = "0.0.0.0"
     port = 6969
 
     # As found in the source code.

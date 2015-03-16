@@ -67,8 +67,8 @@ class AbstractNop (Dynamic):
 class AbstractPadder (Decorator):
     """
     Pads the buffer with NOP instructions, either before or after a shellcode.
-    Useful when the vulnerable program expects a minimum amount of bytes in the
-    buffer.
+    Useful when the vulnerable program expects a minimum amount of bytes in
+    the buffer.
     """
 
     @property

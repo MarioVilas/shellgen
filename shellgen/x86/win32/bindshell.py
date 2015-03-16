@@ -41,6 +41,7 @@ class BindShell (Static):
     qualities = "payload"
     encoding  = "termnull"
 
+    address = "0.0.0.0"
     port = 4444
 
     bytes = (

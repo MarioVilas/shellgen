@@ -42,6 +42,8 @@ class BindShell (Dynamic):
     qualities = "payload"
     encoding  = "nullfree"
 
+    address = "0.0.0.0"
+
     variants = {
 
         # javicoder variant

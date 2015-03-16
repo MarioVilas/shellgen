@@ -26,7 +26,7 @@ __all__ = ['metadata', 'setup']
 from distutils.core import setup, Command
 from warnings import warn
 from os import walk
-from os.path import abspath, dirname, curdir, join, isdir, isfile, sep
+from os.path import abspath, dirname, curdir, join, sep
 
 # Define the parameters for the setup script.
 metadata = {
