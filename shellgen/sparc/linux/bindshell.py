@@ -7,7 +7,7 @@
 ## http://www.48bits.com/papers/sparc_shellcodes.txt                         ##
 ###############################################################################
 
-# Copyright (c) 2012-2013 Mario Vilas, javicoder, pancake
+# Copyright (c) 2012-2015 Mario Vilas, javicoder, pancake
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by

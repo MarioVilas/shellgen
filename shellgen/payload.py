@@ -4,7 +4,7 @@
 ## Prepackaged payloads for ShellGen                                         ##
 ###############################################################################
 
-# Copyright (c) 2012-2013 Mario Vilas
+# Copyright (c) 2012-2015 Mario Vilas
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -28,11 +28,11 @@ Prepackaged payloads for ShellGen.
     shell, download_exec, execute, adduser, chmod
 
 @group Encoders:
-    xor_encode, ascii_encode, alpha_encode, unicode_encode
+    nullfree_encode, xor_encode, ascii_encode, alpha_encode, unicode_encode
 """
 
 from __future__ import absolute_import
-from .base import *
+from .util import get_shellcode_class
 
 __all__ = [
 
@@ -44,12 +44,14 @@ __all__ = [
     'chmod',
 
     # Encoders.
+    'nullfree_encode',
     'xor_encode',
     'ascii_encode',
     'alpha_encode',
     'unicode_encode',
 
     # Stagers.
+    # TODO
 ]
 
 # NOTE: all methods here must invoke the compile() method before returning the
@@ -243,6 +245,36 @@ def chmod(arch, os, **options):
 
 ###############################################################################
 ## Encoders.
+
+def nullfree_encode(payload):
+    """
+    Encode the payload and prepend a decoder to bypass null character
+    restrictions.
+
+    @type  payload: L{Shellcode}
+    @param payload: Payload to encode.
+
+    @rtype:  L{Shellcode}
+    @return: Shellcode object with the encoded payload.
+
+    @raise ArithmeticError: Could not satisfy the null character constraint.
+
+    @raise TypeError: A required option is missing, or an option contains the
+        wrong data type.
+
+    @raise ValueError: An option contains the correct data type but an
+        incorrect value.
+
+    @raise NotImplementedError: The specified encoder does not support the
+        requested architecture, operating system or specified options.
+    """
+    try:
+        encoder = get_shellcode_class(payload.arch, payload.os, "nullfree", "NullFreeEncoder")
+    except NotImplementedError:
+        encoder = get_shellcode_class(payload.arch, "nullfree", "NullFreeEncoder")
+    payload = encoder(payload)
+    payload.compile()
+    return payload
 
 def xor_encode(payload, bad_chars = "\0\r\n\x1a\"'`%,;:."):
     """
