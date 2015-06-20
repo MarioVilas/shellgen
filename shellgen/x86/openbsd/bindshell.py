@@ -37,7 +37,7 @@ class BindShell (Static):
     "Bind to TCP port 6969 and execute /bin/sh in OpenBSD/x86.
 
     Based on original code by pancake from 48bits:
-    U{http://radare.org/y/}
+    `<http://radare.org/y/>`_
     """
 
     qualities = "payload"

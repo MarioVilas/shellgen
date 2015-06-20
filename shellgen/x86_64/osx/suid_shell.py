@@ -35,7 +35,7 @@ class SuidShell (Static):
     Setuid, Fork and execute /bin/sh in MacOSX/x86_64.
 
     Based on original code by capi_x from 48bits:
-    U{http://radare.org/y/}
+    `<http://radare.org/y/>`_
     """
 
     qualities = "payload"

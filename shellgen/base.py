@@ -69,7 +69,7 @@ def is_valid_module_path_component(token):
         all( ( (x.isalnum() or x == '_') for x in token ) )
 
 def meta_canonicalize_platform_tag(tag):
-    "Canonicalizes the processor architecture. See L{meta_canonicalize}."
+    "Canonicalizes the processor architecture. See `meta_canonicalize`."
     if not tag:
         tag = 'any'
     else:
@@ -77,7 +77,7 @@ def meta_canonicalize_platform_tag(tag):
     return tag
 
 def meta_canonicalize_platform(arch, os, classname = None):
-    "Canonicalizes and validates arch and os. See L{meta_canonicalize}."
+    "Canonicalizes and validates arch and os. See `meta_canonicalize`."
 
     # Validate the processor architecture.
     if not isinstance(arch, property):
@@ -106,7 +106,7 @@ def meta_canonicalize_platform(arch, os, classname = None):
     return arch, os
 
 def meta_canonicalize_tags(tags):
-    "Canonicalizes tags. See L{meta_canonicalize}."
+    "Canonicalizes tags. See `meta_canonicalize`."
 
     # Ignore class properties.
     if isinstance(tags, property):
@@ -186,7 +186,7 @@ def meta_autodetect_platform(cls):
     """
     Dark magic to autodetect the platform for built-in shellcodes.
 
-    User-defined shellcodes must define "arch" and "os".
+    User-defined shellcodes must define *arch* and *os*.
     """
     abspath = path.abspath
     join = path.join
@@ -216,23 +216,23 @@ def meta_autodetect_encoding(bytes):
     Tries to autodetect the encoding of the given shellcode bytes.
 
     Currently the following encodings are detected:
-     - C{term_null}
-     - C{nullfree}
-     - C{ascii}
-     - C{alpha}
-     - C{lower}
-     - C{upper}
-     - C{unicode}
+     - *term_null*
+     - *nullfree*
+     - *ascii*
+     - *alpha*
+     - *lower*
+     - *upper*
+     - *unicode*
 
-    @note: The detection for Unicode is only for shellcodes encoded using the
+    :note: The detection for Unicode is only for shellcodes encoded using the
         Venetian technique. It cannot tell if the shellcode would actually
         survive the codepage translation.
 
-    @type  bytes: str
-    @param bytes: Compiled bytecode to test for encodings.
+    :type  bytes: str
+    :param bytes: Compiled bytecode to test for encodings.
 
-    @rtype:  tuple(str)
-    @return: Encoding constraints for this shellcode.
+    :rtype:  tuple(str)
+    :return: Encoding constraints for this shellcode.
     """
     encoding = []
     if isinstance(bytes, Shellcode):
@@ -263,7 +263,7 @@ def meta_autodetect_encoding(bytes):
     return tuple(sorted(encoding))
 
 def meta_compile(compile):
-    "Wraps the compile() method to do dark magic, see L{meta_shellcode}."
+    "Wraps the compile() method to do dark magic, see `meta_shellcode`."
 
     @functools.wraps(compile)
     def compile_wrapper(self, state = None):
@@ -318,7 +318,7 @@ class meta_shellcode_final(meta_shellcode):
         super(meta_shellcode_final, cls).__init__(name, bases, namespace)
 
 class meta_shellcode_static(meta_shellcode):
-    "Same as L{meta_shellcode} but specifically for static shellcodes."
+    "Same as `meta_shellcode` but specifically for static shellcodes."
     def __init__(cls, name, bases, namespace):
         super(meta_shellcode_static, cls).__init__(name, bases, namespace)
 
@@ -337,7 +337,7 @@ class meta_shellcode_static(meta_shellcode):
             cls.encoding = meta_autodetect_encoding(cls.bytes)
 
 class meta_shellcode_raw(meta_shellcode_static):
-    "Combination of L{meta_shellcode_static} and L{meta_shellcode_final}."
+    "Combination of `meta_shellcode_static` and `meta_shellcode_final`."
     def __init__(cls, name, bases, namespace):
         for clazz in bases:
             if isinstance(clazz, meta_shellcode_raw):
@@ -347,24 +347,25 @@ class meta_shellcode_raw(meta_shellcode_static):
 def copy_classes(all, name, namespace):
     """
     Helper function to redefine classes imported from another module,
-    to have L{meta_shellcode} update the metadata automatically.
+    to have `meta_shellcode` update the metadata automatically.
 
     Example::
+
         # In shellgen.x86_64.nop
         from shellgen.x86.nop import *
         from shellgen.x86.nop import __all__
         from shellgen.base import copy_classes
         copy_classes(__all__, __name__, vars())
 
-    @type  all: list(str)
-    @param all: The __all__ value for the calling module.
+    :type  all: list(str)
+    :param all: The *__all__* value for the calling module.
 
-    @type  name: str
-    @param name: The __name__ value for the calling module.
+    :type  name: str
+    :param name: The *__name__* value for the calling module.
 
-    @type  namespace: dict
-    @param namespace: The namespace of the calling module,
-        namely, the result of calling C{vars()}.
+    :type  namespace: dict
+    :param namespace: The namespace of the calling module,
+        namely, the result of calling *vars()*.
     """
 
     # For all exported symbols...
@@ -424,25 +425,25 @@ class CompilerState (object):
     They are passed to and modified in place by all pieces of shellcode
     during compilation, in left to right order.
 
-    @type offset: int
-    @ivar offset: Current offset in the compiled bytecode.
+    :type offset: int
+    :ivar offset: Current offset in the compiled bytecode.
 
-    @type current: dict
-    @ivar current: Current state.
+    :type current: dict
+    :ivar current: Current state.
         This is used by this piece of shellcode to communicate things to
         the next piece, but only to the next piece.
 
-    @type previous: dict
-    @ivar previous: Previous state.
+    :type previous: dict
+    :ivar previous: Previous state.
         This is used by the previous piece of shellcode to communicate things
         to this piece, but only to this piece.
 
-    @type shared: dict
-    @ivar shared: Shared variables.
+    :type shared: dict
+    :ivar shared: Shared variables.
         This is used to communicate things to all pieces of the shellcode.
 
-    @type callback: WeakValueDictionary
-    @ivar callback: Callback functions.
+    :type callback: WeakValueDictionary
+    :ivar callback: Callback functions.
         This is used to communicate things to all pieces of the shellcode.
     """
     def __init__(self):
@@ -460,9 +461,9 @@ class CompilerState (object):
         """
         Called when moving to the next piece of shellcode.
 
-        @type  delta: int
-        @param delta: Number of compiled bytes in this piece of shellcode.
-            It will be added to L{offset}.
+        :type  delta: int
+        :param delta: Number of compiled bytes in this piece of shellcode.
+            It will be added to *offset*.
         """
         self.offset   += delta
         self.previous  = self.current
@@ -472,15 +473,15 @@ class CompilerState (object):
         """
         Register a callback function.
 
-        @note: Callbacks are stored as weak references.
+        :note: Callbacks are stored as weak references.
 
-        @see: L{call}, L{unregister_callback}
+        :see: `call`, `unregister_callback`
 
-        @type  name: str
-        @param name: Name of the callback function.
+        :type  name: str
+        :param name: Name of the callback function.
 
-        @type  function: callable
-        @param function: Callback function. when called the first argument it
+        :type  function: callable
+        :param function: Callback function. when called the first argument it
             receives will be this CompilerState object.
         """
         self.callback[name] = function
@@ -489,13 +490,13 @@ class CompilerState (object):
         """
         Unregister a callback function.
 
-        @note: Does not raise any exception when the callback had already been
+        :note: Does not raise any exception when the callback had already been
             unregistered, or was never registered in the first place.
 
-        @see: L{call}, L{register_callback}
+        :see: `call`, `register_callback`
 
-        @type  name: str
-        @param name: Name of the callback function.
+        :type  name: str
+        :param name: Name of the callback function.
         """
         try:
             del self.callback[name]
@@ -508,13 +509,13 @@ class CompilerState (object):
         object as the first argument, followed by all extra arguments passed to
         this method.
 
-        @see: L{register_callback}, L{unregister_callback}
+        :see: `register_callback`, `unregister_callback`
 
-        @type  name: str
-        @param name: Name of the callback function.
+        :type  name: str
+        :param name: Name of the callback function.
 
-        @return: Return value of the callback function.
-        @raise KeyError: The callback is not registered.
+        :return: Return value of the callback function.
+        :raise KeyError: The callback is not registered.
             Since callbacks are stored as weak references, they may be
             unregistered automatically when the object they live in is
             destroyed.
@@ -530,9 +531,9 @@ class CompilerState (object):
     # XXX not sure if this should be here, it's practical but not very elegant
     def requires_nullfree(self):
         """
-        @rtype:  bool
-        @return: C{True} if the shellcode is required to be null free,
-            C{False} otherwise.
+        :rtype:  bool
+        :return: *True* if the shellcode is required to be null free,
+            *False* otherwise.
         """
         return (
             'nullfree' in self.shared.get('encoding', '') or
@@ -545,52 +546,52 @@ class Shellcode (object):
     """
     Base shellcode type.
 
-    @type arch: str
-    @cvar arch: Processor architecture supported by this shellcode.
-        Use C{"any"} for architecture independent shellcodes.
+    :type arch: str
+    :cvar arch: Processor architecture supported by this shellcode.
+        Use *"any"* for architecture independent shellcodes.
 
-    @type os: str
-    @cvar os: Operating system.
-        Use C{"any"} for platform independent shellcodes.
+    :type os: str
+    :cvar os: Operating system.
+        Use *"any"* for platform independent shellcodes.
 
-    @type requires: tuple(str)
-    @cvar requires: Features required by this shellcode.
+    :type requires: tuple(str)
+    :cvar requires: Features required by this shellcode.
 
-    @type provides: tuple(str)
-    @cvar provides: Features provided by this shellcodes.
+    :type provides: tuple(str)
+    :cvar provides: Features provided by this shellcodes.
 
-    @type qualities: tuple(str)
-    @cvar qualities: Runtime characteristics of this shellcode.
+    :type qualities: tuple(str)
+    :cvar qualities: Runtime characteristics of this shellcode.
 
-    @type encoding: tuple(str)
-    @cvar encoding: Encoding constraints for this shellcode.
+    :type encoding: tuple(str)
+    :cvar encoding: Encoding constraints for this shellcode.
 
-    @type name: str
-    @cvar name: Name of this shellcode.
+    :type name: str
+    :cvar name: Name of this shellcode.
 
-    @type parent: L{Container}
-    @ivar parent: Parent shellcode.
+    :type parent: `Container`
+    :ivar parent: Parent shellcode.
 
-    @type offset: int
-    @ivar offset: Current offset assumed when compiling.
+    :type offset: int
+    :ivar offset: Current offset assumed when compiling.
         Filled in automatically during compilation.
 
-    @type bytes: str
-    @ivar bytes: Compiled bytecode for this shellcode.
+    :type bytes: str
+    :ivar bytes: Compiled bytecode for this shellcode.
         May raise an exception on compilation errors.
 
-    @type length: int
-    @ivar length: Length of the compiled bytecode for this shellcode.
+    :type length: int
+    :ivar length: Length of the compiled bytecode for this shellcode.
         May raise an exception on compilation errors.
 
-    @type stages: list(L{Shellcode})
-    @ivar stages: List of subsequent shellcode stages.
-        Empty list if this shellcode is not a L{Stager}.
+    :type stages: list(`Shellcode`)
+    :ivar stages: List of subsequent shellcode stages.
+        Empty list if this shellcode is not a `Stager`.
         May raise an exception on compilation errors.
 
-    @type children: list(L{Shellcode})
-    @ivar children: Child shellcodes.
-        Empty list if this shellcode is not a L{Container}.
+    :type children: list(`Shellcode`)
+    :ivar children: Child shellcodes.
+        Empty list if this shellcode is not a `Container`.
     """
 
     # Autoloads the platform for our shellcodes.
@@ -668,11 +669,11 @@ class Shellcode (object):
         """
         Compile this shellcode.
 
-        @type  state: L{CompilerState}
-        @param state: Compilation variables.
+        :type  state: `CompilerState`
+        :param state: Compilation variables.
 
-        @rtype:  str
-        @return: Compiled bytecode.
+        :rtype:  str
+        :return: Compiled bytecode.
         """
         raise NotImplementedError("Subclasses MUST implement this method!")
 
@@ -680,11 +681,12 @@ class Shellcode (object):
         """
         Determines if the shellcode has been compiled.
 
-        A shellcode is compiled after the L{compile} method is called, and it's
-        not compiled when it hasn't been called yet or after the L{clean}
+        A shellcode is compiled after the *compile* method is called, and it's
+        not compiled when it hasn't been called yet or after the *clean*
         method is called.
 
         For example::
+
             >>> from shellgen.x86.nop import Nop
             >>> shellcode = Nop()
             >>> shellcode.is_compiled()
@@ -700,8 +702,8 @@ class Shellcode (object):
             >>> shellcode.is_compiled()
             True
 
-        @rtype:  bool
-        @return: C{True} if the shellcode is compiled, C{False} otherwise.
+        :rtype:  bool
+        :return: *True* if the shellcode is compiled, *False* otherwise.
         """
         raise NotImplementedError("Subclasses MUST implement this method!")
 
@@ -713,9 +715,9 @@ class Shellcode (object):
         """
         Relocate bytecode by the specified delta offset if possible.
 
-        The L{offset} instance variable will be incremented by C{delta}.
+        The `offset` instance variable will be incremented by *delta*.
 
-        @note: Note to shellcode writers:
+        :note: Note to shellcode writers:
 
             Most shellcodes can safely ignore this, since they're position
             independent anyways.
@@ -727,11 +729,11 @@ class Shellcode (object):
             Also, if you implement this method in your class, don't forget to
             call the superclass method!
 
-        @type  delta: int
-        @param delta: Delta offset.
+        :type  delta: int
+        :param delta: Delta offset.
 
-        @raise NotImplementedError: This shellcode doesn't support relocation.
-        @raise RuntimeError: An error occurred when trying to relocate.
+        :raise NotImplementedError: This shellcode doesn't support relocation.
+        :raise RuntimeError: An error occurred when trying to relocate.
         """
         #
         # XXX TODO
@@ -773,10 +775,10 @@ class Shellcode (object):
         This means they are for the same plaform, or at least one of them is
         platform independent.
 
-        @type  other: L{Shellcode}
-        @param other: Another shellcode.
+        :type  other: `Shellcode`
+        :param other: Another shellcode.
 
-        @return: There is no return value.
+        :return: There is no return value.
             Warnings are raised if the platforms don't match.
         """
         if 'any' not in (self.arch, other.arch) and self.arch != other.arch:
@@ -813,10 +815,10 @@ class Shellcode (object):
         """
         Add the given requirement on runtime.
 
-        @see: L{requires}
+        :see: `requires`
 
-        @type  requirement: str
-        @param requirement: Requirement.
+        :type  requirement: str
+        :param requirement: Requirement.
         """
         requires = meta_canonicalize_tags(requirement)
         requires = meta_canonicalize_tags(self.requires + requires)
@@ -826,10 +828,10 @@ class Shellcode (object):
         """
         Remove the given requirement on runtime.
 
-        @see: L{requires}
+        :see: `requires`
 
-        @type  requirement: str
-        @param requirement: Requirement.
+        :type  requirement: str
+        :param requirement: Requirement.
         """
         tmp = list(self.requires)
         for x in meta_canonicalize_tags(requirement):
@@ -841,10 +843,10 @@ class Shellcode (object):
         """
         Add the given provided feature on runtime.
 
-        @see: L{provides}
+        @see: `provides`
 
-        @type  provision: str
-        @param provision: Feature.
+        :type  provision: str
+        :param provision: Feature.
         """
         provides = meta_canonicalize_tags(provision)
         provides = meta_canonicalize_tags(self.provides + provides)
@@ -854,10 +856,10 @@ class Shellcode (object):
         """
         Remove the given provided feature on runtime.
 
-        @see: L{provides}
+        :see: `provides`
 
-        @type  provision: str
-        @param provision: Feature.
+        :type  provision: str
+        :param provision: Feature.
         """
         tmp = list(self.provides)
         for x in meta_canonicalize_tags(provision):
@@ -869,10 +871,10 @@ class Shellcode (object):
         """
         Add the given runtime characteristic on runtime.
 
-        @see: L{qualities}
+        :see: `qualities`
 
-        @type  quality: str
-        @param quality: Runtime characteristic.
+        :type  quality: str
+        :param quality: Runtime characteristic.
         """
         qualities = meta_canonicalize_tags(quality)
         qualities = meta_canonicalize_tags(self.qualities + qualities)
@@ -882,10 +884,10 @@ class Shellcode (object):
         """
         Remove the given runtime characteristic on runtime.
 
-        @see: L{qualities}
+        :see: `qualities`
 
-        @type  quality: str
-        @param quality: Runtime characteristic.
+        :type  quality: str
+        :param quality: Runtime characteristic.
         """
         tmp = list(self.qualities)
         for x in meta_canonicalize_tags(quality):
@@ -897,10 +899,10 @@ class Shellcode (object):
         """
         Add the given encoding constraint on runtime.
 
-        @see: L{encoding}
+        :see: `encoding`
 
-        @type  encoding: str
-        @param encoding: Encoding constraint.
+        :type  encoding: str
+        :param encoding: Encoding constraint.
         """
         encoding = meta_canonicalize_tags(encoding)
         encoding = meta_canonicalize_tags(self.encoding + encoding)
@@ -910,10 +912,10 @@ class Shellcode (object):
         """
         Remove the given encoding constraint on runtime.
 
-        @see: L{encoding}
+        :see: `encoding`
 
-        @type  encoding: str
-        @param encoding: Encoding constraint.
+        :type  encoding: str
+        :param encoding: Encoding constraint.
         """
         tmp = list(self.encoding)
         for x in meta_canonicalize_tags(encoding):
@@ -956,32 +958,32 @@ class Raw (Static):
                  requires  = None, provides = None,
                  qualities = None, encoding = None):
         """
-        @type  bytes: str
-        @param bytes: Compiled bytecode for this shellcode.
+        :type  bytes: str
+        :param bytes: Compiled bytecode for this shellcode.
 
-        @type  arch: str
-        @param arch: Processor architecture supported by this shellcode.
-            Use C{"any"} for architecture independent shellcodes.
+        :type  arch: str
+        :param arch: Processor architecture supported by this shellcode.
+            Use *"any"* for architecture independent shellcodes.
 
-        @type  os: str
-        @param os: Operating system.
-            Use C{"any"} for platform independent shellcodes.
+        :type  os: str
+        :param os: Operating system.
+            Use *"any"* for platform independent shellcodes.
 
-        @type  requires: list(str)
-        @param requires: Features required by this shellcode.
+        :type  requires: list(str)
+        :param requires: Features required by this shellcode.
             Defaults to no features.
 
-        @type  provides: list(str)
-        @param provides: Features provided by this shellcodes.
+        :type  provides: list(str)
+        :param provides: Features provided by this shellcodes.
             Defaults to no features.
 
-        @type  qualities: list(str)
-        @param qualities: Runtime characteristics of this shellcode.
+        :type  qualities: list(str)
+        :param qualities: Runtime characteristics of this shellcode.
             Defaults to no characteristics.
 
-        @type  encoding: list(str)
-        @param encoding: Encoding constraints for this shellcode.
-            Autodetected by default, see: L{util.autodetect_encoding}.
+        :type  encoding: list(str)
+        :param encoding: Encoding constraints for this shellcode.
+            Autodetected by default, see: `util.autodetect_encoding`.
         """
         super(Raw, self).__init__()
 
@@ -1024,49 +1026,49 @@ class Raw (Static):
                  qualities = None, encoding = None):
         """
         Load a raw shellcode from an exported dump file
-        generated by the L{shellgen.export} subpackage.
+        generated by the `shellgen.export` subpackage.
 
         This method will ONLY work with raw binary files, hexadecimal dumps,
         or Base64 encoded files.
 
-        To read source code exports, use L{from_source}() instead.
+        To read source code exports, use `from_source` instead.
 
-        @see:
-             - L{shellgen.export.as_raw_binary}
-             - L{shellgen.export.as_hexadecimal}
-             - L{shellgen.export.as_base64}
-             - L{shellgen.util.load_bytecode_from_dump}
+        :see:
+            - `shellgen.export.as_raw_binary`
+            - `shellgen.export.as_hexadecimal`
+            - `shellgen.export.as_base64`
+            - `shellgen.util.load_bytecode_from_dump`
 
-        @type  input: file or str
-        @param input: Filename or open file object.
+        :type  input: file or str
+        :param input: Filename or open file object.
             Open file objects should be in binary mode.
 
-        @type  arch: str
-        @param arch: Processor architecture supported by this shellcode.
-            Use C{"any"} for architecture independent shellcodes.
+        :type  arch: str
+        :param arch: Processor architecture supported by this shellcode.
+            Use *"any"* for architecture independent shellcodes.
 
-        @type  os: str
-        @param os: Operating system.
-            Use C{"any"} for platform independent shellcodes.
+        :type  os: str
+        :param os: Operating system.
+            Use *"any"* for platform independent shellcodes.
 
-        @type  requires: list(str)
-        @param requires: Features required by this shellcode.
+        :type  requires: list(str)
+        :param requires: Features required by this shellcode.
             Defaults to no features.
 
-        @type  provides: list(str)
-        @param provides: Features provided by this shellcodes.
+        :type  provides: list(str)
+        :param provides: Features provided by this shellcodes.
             Defaults to no features.
 
-        @type  qualities: list(str)
-        @param qualities: Runtime characteristics of this shellcode.
+        :type  qualities: list(str)
+        :param qualities: Runtime characteristics of this shellcode.
             Defaults to no characteristics.
 
-        @type  encoding: list(str)
-        @param encoding: Encoding constraints for this shellcode.
-            Autodetected by default, see: L{util.autodetect_encoding}.
+        :type  encoding: list(str)
+        :param encoding: Encoding constraints for this shellcode.
+            Autodetected by default, see: `util.autodetect_encoding`.
 
-        @rtype:  Raw
-        @return: Raw shellcode.
+        :rtype:  Raw
+        :return: Raw shellcode.
         """
         from .util import load_bytecode_from_dump
         bytes = load_bytecode_from_dump(input)
@@ -1078,54 +1080,54 @@ class Raw (Static):
                  qualities = None, encoding = None):
         """
         Load a raw shellcode from an exported source code
-        generated by the L{shellgen.export} subpackage.
+        generated by the `shellgen.export` subpackage.
 
         This function will NOT work with raw binary files, hexadecimal dumps,
         nor Base64 encoded files.
 
-        To read exported dump files, use L{from_dump}() instead.
+        To read exported dump files, use `from_dump` instead.
 
-        @see:
-             - L{shellgen.export.as_python_source}
-             - L{shellgen.export.as_ruby_source}
-             - L{shellgen.export.as_perl_source}
-             - L{shellgen.export.as_php_source}
-             - L{shellgen.export.as_javascript_source}
-             - L{shellgen.export.as_vbscript_source}
-             - L{shellgen.export.as_c_source}
-             - L{shellgen.export.as_cpp_source}
-             - L{shellgen.util.load_bytecode_from_source}
+        :see:
+             - `shellgen.export.as_python_source`
+             - `shellgen.export.as_ruby_source`
+             - `shellgen.export.as_perl_source`
+             - `shellgen.export.as_php_source`
+             - `shellgen.export.as_javascript_source`
+             - `shellgen.export.as_vbscript_source`
+             - `shellgen.export.as_c_source`
+             - `shellgen.export.as_cpp_source`
+             - `shellgen.util.load_bytecode_from_source`
 
-        @type  input: file or str
-        @param input: Filename or open file object.
+        :type  input: file or str
+        :param input: Filename or open file object.
             Open file objects should be in universal newline mode.
 
-        @type  arch: str
-        @param arch: Processor architecture supported by this shellcode.
-            Use C{"any"} for architecture independent shellcodes.
+        :type  arch: str
+        :param arch: Processor architecture supported by this shellcode.
+            Use *"any"* for architecture independent shellcodes.
 
-        @type  os: str
-        @param os: Operating system.
-            Use C{"any"} for platform independent shellcodes.
+        :type  os: str
+        :param os: Operating system.
+            Use *"any"* for platform independent shellcodes.
 
-        @type  requires: list(str)
-        @param requires: Features required by this shellcode.
+        :type  requires: list(str)
+        :param requires: Features required by this shellcode.
             Defaults to no features.
 
-        @type  provides: list(str)
-        @param provides: Features provided by this shellcodes.
+        :type  provides: list(str)
+        :param provides: Features provided by this shellcodes.
             Defaults to no features.
 
-        @type  qualities: list(str)
-        @param qualities: Runtime characteristics of this shellcode.
+        :type  qualities: list(str)
+        :param qualities: Runtime characteristics of this shellcode.
             Defaults to no characteristics.
 
-        @type  encoding: list(str)
-        @param encoding: Encoding constraints for this shellcode.
-            Autodetected by default, see: L{util.autodetect_encoding}.
+        :type  encoding: list(str)
+        :param encoding: Encoding constraints for this shellcode.
+            Autodetected by default, see: `util.autodetect_encoding`.
 
-        @rtype:  Raw
-        @return: Raw shellcode.
+        :rtype:  Raw
+        :return: Raw shellcode.
         """
         from .util import load_bytecode_from_source
         bytes = load_bytecode_from_source(input)
@@ -1176,18 +1178,18 @@ class Dynamic (Shellcode):
 
     def _compile_hook(self, compile, state = None):
         """
-        Hooks the L{compile} method to save the bytecode in the cache.
-        Called from L{meta_compile}.
+        Hooks the `compile` method to save the bytecode in the cache.
+        Called from `meta_compile`.
 
-        @type  compile: method
-        @param compile: Implementation of L{compile}
-            before being wrapped by L{meta_compile}.
+        :type  compile: method
+        :param compile: Implementation of `compile`
+            before being wrapped by `meta_compile`.
 
-        @type  state: L{CompilerState}
-        @param state: Compilation variables.
+        :type  state: `CompilerState`
+        :param state: Compilation variables.
 
-        @rtype: str
-        @return: Compiled bytecode.
+        :rtype: str
+        :return: Compiled bytecode.
         """
 
         # Create a new compiler state if needed.
@@ -1215,7 +1217,7 @@ class Container (Dynamic):
     Containers may hold one or more child shellcodes. When compiled, all of
     the child shellcodes are compiled as well.
 
-    @note: By default, the encoding of a Container instance is the intersection
+    :note: By default, the encoding of a Container instance is the intersection
         if the encoding declared in the class with the encodings of its child
         instances. For example::
 
@@ -1413,16 +1415,16 @@ class Concatenator (Container):
     """
     Simple concatenation of two or more shellcodes.
 
-    @type arch: str
-    @ivar arch: Processor architecture common to all child shellcodes.
-        If there is no common architecture, the value will be "any".
+    :type arch: str
+    :ivar arch: Processor architecture common to all child shellcodes.
+        If there is no common architecture, the value will be *"any"*.
 
-    @type os: str
-    @ivar os: Operating system common to all child shellcodes.
-        If there is no common OS, the value will be "any".
+    :type os: str
+    :ivar os: Operating system common to all child shellcodes.
+        If there is no common OS, the value will be *"any"*.
 
-    @type encoding: tuple(str)
-    @ivar encoding: Intersection of the supported encodings of all its child
+    :type encoding: tuple(str)
+    :ivar encoding: Intersection of the supported encodings of all its child
         shellcodes.
     """
 
@@ -1490,8 +1492,8 @@ class Decorator (Container):
 
     def __init__(self, child):
         """
-        @type  child: L{Shellcode}
-        @param child: Shellcode whose compilation will be modified.
+        :type  child: `Shellcode`
+        :param child: Shellcode whose compilation will be modified.
         """
         super(Decorator, self).__init__(child)
 
@@ -1517,7 +1519,7 @@ class Encoder (Decorator):
     Encoders wrap around a shellcode to pass encoding restrictions, for example
     ASCII character filters or Unicode codepage conversions.
 
-    @note: Encoders always override the encoding of their child.
+    :note: Encoders always override the encoding of their child.
 
         For example::
 
@@ -1548,8 +1550,8 @@ class Stager (Dynamic):
     """
     Stagers split shellcode execution into load stages.
 
-    @type next_stage: L{Shellcode}
-    @ivar next_stage: Next load stage.
+    :type next_stage: `Shellcode`
+    :ivar next_stage: Next load stage.
     """
 
     # Updated on object instances.
@@ -1557,8 +1559,8 @@ class Stager (Dynamic):
 
     def __init__(self, next_stage):
         """
-        @type  next_stage: L{Shellcode}
-        @param next_stage: Next load stage.
+        :type  next_stage: `Shellcode`
+        :param next_stage: Next load stage.
         """
         self._next_stage = next_stage
 
@@ -1591,26 +1593,26 @@ class Stager (Dynamic):
 #
 #    The child shellcode and the calling shellcodes must support relocation.
 #
-#    @see: L{relocate}
+#    :see: `relocate`
 #
-#    @type name: str
-#    @ivar name: Name of the function.
+#    :type name: str
+#    :ivar name: Name of the function.
 #
-#    @type offset: int
-#    @ivar offset: Offset from the start of the complete shellcode where the
+#    :type offset: int
+#    :ivar offset: Offset from the start of the complete shellcode where the
 #        function is assumed to be. This property is set automatically when
-#        compiling. See: L{CompilerState.offset}
+#        compiling. See: `CompilerState.offset`
 #    """
 #
 #    def __init__(self, child, name):
 #        """
-#        @type  child: L{Shellcode}
-#        @param child: Shellcode to be made into a function.
+#        :type  child: `Shellcode`
+#        :param child: Shellcode to be made into a function.
 #
-#        @type  name: str
-#        @param name: Name of the function.
+#        :type  name: str
+#        :param name: Name of the function.
 #            When compiling, a shared variable of this name will be stored in
-#            the L{CompilerState}. Calling shellcodes can call the function
+#            the `CompilerState`. Calling shellcodes can call the function
 #            like this::
 #
 #                def compile(self, state):
@@ -1656,14 +1658,14 @@ class Stager (Dynamic):
 #        """
 #        Compile a call/branch instruction pointing to the child shellcode.
 #
-#        @type  state: L{CompilerState}
-#        @param state: Compilation variables.
+#        :type  state: `CompilerState`
+#        :param state: Compilation variables.
 #
-#        @type  bytes: str
-#        @param bytes: Bytecode currently being compiled.
+#        :type  bytes: str
+#        :param bytes: Bytecode currently being compiled.
 #
-#        @rtype:  str
-#        @return: Bytecode currently being compiled, with the addition of a
+#        :rtype:  str
+#        :return: Bytecode currently being compiled, with the addition of a
 #            call/branch instruction pointing to the child shellcode.
 #        """
 #        raise NotImplementedError("Subclasses MUST implement this method!")

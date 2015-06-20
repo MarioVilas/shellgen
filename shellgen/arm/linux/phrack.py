@@ -34,7 +34,7 @@ class Phrack66 (Static):
     """
     Example shellcode from Phrack #66.
 
-    U{http://www.phrack.org/issues.html?issue=66&id=12}
+    `Source <http://www.phrack.org/issues.html?issue=66&id=12>`_
     """
 
     qualities = "payload"

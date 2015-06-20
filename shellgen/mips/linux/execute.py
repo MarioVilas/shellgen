@@ -32,8 +32,8 @@ class Execute (Dynamic):
     """
     Execute any command on Linux/MIPS.
 
-    Based on anonymous code found on the Internet
-    U{http://www.shell-storm.org/shellcode/files/shellcode-141.php}
+    Based on anonymous code found on the Internet:
+    `<http://www.shell-storm.org/shellcode/files/shellcode-141.php>`_
     """
 
     qualities = ("payload", "no_stack")

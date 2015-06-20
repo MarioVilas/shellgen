@@ -48,7 +48,7 @@ ShellGen has four basic use cases:
 
  - Import ShellGen from your Python exploit and write your own shellcodes.
    You can do this by inheriting from one of the ShellGen classes within your
-   exploit code, or by adding a new C{.py} file to ShellGen itself.
+   exploit code, or by adding a new *.py* file to ShellGen itself.
 
    If you want to share your custom shellcode to be added to ShellGen, just
    drop us an email or find us on Twitter! We're more than happy to receive
@@ -58,40 +58,40 @@ Module structure
 ----------------
 
 The most important modules are:
- - L{shellgen.payload}: This is a simple interface to get just the canned
+ - `shellgen.payload`: This is a simple interface to get just the canned
    payloads from ShellGen. Most users will just want this.
- - L{shellgen.base}: This is where the base classes for all shellcodes are.
+ - `shellgen.base`: This is where the base classes for all shellcodes are.
    See this to learn how ShellGen works on the inside.
- - L{shellgen.export}: This is for exporting shellcodes to source code files.
- - L{shellgen.util}: Miscellaneous utility functions. Check them out so you
+ - `shellgen.export`: This is for exporting shellcodes to source code files.
+ - `shellgen.util`: Miscellaneous utility functions. Check them out so you
    don't end up reinventing the wheel!
 
 The rest of the modules contain the shellcodes themselves, organized by target
-platform: C{shellgen.B{<processor architecture>}.B{<operating system>}.B{<module>}}.
+platform: shellgen.**[processor architecture]**.**[operating system]**.**[module]**.
 
 You'll notice module names and class names are repeated throughout ShellGen.
 This is intentional - by providing a consistent interface to similar shellcodes
-of different platforms, the L{shellgen.payload} module can (almost) seamlessly
+of different platforms, the `shellgen.payload` module can (almost) seamlessly
 build canned payloads for any supported platform without much platform-specific
 logic in it. It also makes it easier to remember the shellcode names when
 customizing your exploit's payload.
 
-The C{abstract} architecture contains platform-independent functionality used
+The *abstract* architecture contains platform-independent functionality used
 by other shellcodes, to avoid code repetition. Sometimes, shellcodes may import
-each other to reuse some functionality (for example, most C{x86_64} shellcodes
-just subclass their C{x86} counterparts and make the appropriate changes).
+each other to reuse some functionality (for example, most *x86_64* shellcodes
+just subclass their *x86* counterparts and make the appropriate changes).
 
 Extending ShellGen
 ------------------
 
-To add your own shellcodes to the library, just drop your C{.py} file in the
+To add your own shellcodes to the library, just drop your *.py* file in the
 corresponding place of the directory structure. If the target platform is
-missing, simply create a new directory and add an empty C{__init__.py} in it so
+missing, simply create a new directory and add an empty *__init__.py* in it so
 Python recognizes it.
 
 You may also define your custom shellcodes inside your exploit, but then you'll
 have to explicitly tell ShellGen which platforms they support by defining the
-L{Shellcode.arch} and L{Shellcode.os} properties in your classes.
+`Shellcode.arch` and `Shellcode.os` properties in your classes.
 
 Reference documentation
 -----------------------

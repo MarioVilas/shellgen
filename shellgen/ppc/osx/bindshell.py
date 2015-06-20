@@ -36,7 +36,7 @@ class BindShell (Static):
     Contains null characters.
 
     Based on original code by pancake from 48bits:
-    U{http://radare.org/y/}
+    `<http://radare.org/y/>`_
     """
 
     qualities = "payload"

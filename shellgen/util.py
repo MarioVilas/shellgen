@@ -24,8 +24,8 @@
 """
 Utility functions for ShellGen.
 
-@type default_bad_chars: str
-@var  default_bad_chars: Default list of bad characters for encoders.
+:type default_bad_chars: str
+:var  default_bad_chars: Default list of bad characters for encoders.
 """
 
 from __future__ import absolute_import, with_statement
@@ -74,35 +74,35 @@ def compile_child(shellcode, state = None,
     """
     Compiles the given shellcode under special circumstances.
 
-    Using the C{current_offset} option, compilation assumes the given offset
-    instead of the value from L{CompilerState.offset}.
+    Using the *current_offset* option, compilation assumes the given offset
+    instead of the value from `CompilerState.offset`.
 
-    Using the C{preserve_offset} option, the current offset is not modified
+    Using the *preserve_offset* option, the current offset is not modified
     after compiling the shellcode.
 
-    Using the C{preserve_state} you can control whether the state reflects that
-    another shellcode has been compiled, or it's treated as part as the
+    Using the *preserve_state* you can control whether the state reflects that
+    another shellcode has been compiled, or it is treated as part as the
     currently compiling shellcode.
 
-    @type  shellcode: L{Shellcode}
-    @param shellcode: Shellcode to compile.
+    :type  shellcode: `Shellcode`
+    :param shellcode: Shellcode to compile.
 
-    @type  state: L{CompilerState}
-    @param state: Compilation state.
+    :type  state: `CompilerState`
+    :param state: Compilation state.
 
-    @type  current_offset: int
-    @param current_offset: The current offset to use.
+    :type  current_offset: int
+    :param current_offset: The current offset to use.
 
-    @type  preserve_offset: bool
-    @param preserve_offset: C{True} to preserve the offset, C{False} to update
+    :type  preserve_offset: bool
+    :param preserve_offset: *True* to preserve the offset, *False* to update
         the offset after compilation.
 
-    @type  preserve_state: bool
-    @param preserve_state: C{True} to compile within the state context of the
-        caller, C{False} to compile normally.
+    :type  preserve_state: bool
+    :param preserve_state: *True* to compile within the state context of the
+        caller, *False* to compile normally.
 
-    @rtype:  str
-    @return: Compiled bytecode.
+    :rtype:  str
+    :return: Compiled bytecode.
     """
     if not state:
         state = CompilerState()
@@ -134,31 +134,31 @@ def get_shellcode_class(arch, os, module, classname):
     Get the requested shellcode class by classname, module, processor
     architecture and operating system.
 
-    Tipically exploits would directly import the shellcode classes, but this
+    Typically exploits would directly import the shellcode classes, but this
     helper function is useful if for some reason the platform must be set
     dynamically.
 
-    @see: L{get_available_platforms}
+    :see: `get_available_platforms`
 
-    @type  arch: str
-    @param arch: Target processor architecture.
-        Must be C{None} or C{"any"} for platform independent shellcodes.
+    :type  arch: str
+    :param arch: Target processor architecture.
+        Must be *None* or *"any"* for platform independent shellcodes.
 
-    @type  os: str
-    @param os: Target operating system.
-        Must be C{None} or C{"any"} for OS independent shellcodes.
+    :type  os: str
+    :param os: Target operating system.
+        Must be *None* or *"any"* for OS independent shellcodes.
 
-    @type  module: str
-    @param module: Shellcode module name.
+    :type  module: str
+    :param module: Shellcode module name.
 
-    @type  classname: str
-    @param classname: Shellcode class name.
+    :type  classname: str
+    :param classname: Shellcode class name.
 
-    @rtype:  class
-    @return: Shellcode class.
+    :rtype:  class
+    :return: Shellcode class.
 
-    @raise ValueError: Invalid arguments.
-    @raise NotImplementedError: The requested shellcode could not be found.
+    :raise ValueError: Invalid arguments.
+    :raise NotImplementedError: The requested shellcode could not be found.
     """
 
     # Canonicalize the arch and os.
@@ -198,14 +198,14 @@ def get_available_platforms():
     This operation involves accessing the filesystem, so you may want to cache
     the response.
 
-    @see: L{get_available_modules}, L{get_available_classes},
-        L{get_shellcode_class}
+    :see: `get_available_modules`, `get_available_classes`,
+        `get_shellcode_class`
 
-    @rtype: list( tuple(str, str) )
-    @return: List of available architectures from built-in shellcodes.
+    :rtype: list( tuple(str, str) )
+    :return: List of available architectures from built-in shellcodes.
         Each element in the list is a tuple containing:
-         - processor architecture
-         - operating system
+        - processor architecture
+        - operating system
     """
 
     # A Python trick: keep some symbols external to the function as local vars.
@@ -271,19 +271,19 @@ def get_available_modules(arch, os):
     This operation involves accessing the filesystem, so you may want to cache
     the response.
 
-    @see: L{get_available_platforms}
+    :see: `get_available_platforms`
 
-    @type  arch: str
-    @param arch: Target processor architecture.
-        Must be C{None} or C{"any"} for platform independent shellcodes.
+    :type  arch: str
+    :param arch: Target processor architecture.
+        Must be *None* or *"any"* for platform independent shellcodes.
 
-    @type  os: str
-    @param os: Target operating system.
-        Must be C{None} or C{"any"} for OS independent shellcodes.
+    :type  os: str
+    :param os: Target operating system.
+        Must be *None* or *"any"* for OS independent shellcodes.
 
-    @rtype:  list(str)
-    @return: List of shellcode module names.
-    @raise ValueError: Invalid arguments.
+    :rtype:  list(str)
+    :return: List of shellcode module names.
+    :raise ValueError: Invalid arguments.
     """
 
     # Canonicalize the arch and os.
@@ -326,21 +326,21 @@ def get_available_classes(arch, os, module):
     @warn: This causes the module to be imported, in order to fetch the class
         names from it.
 
-    @see: L{get_available_modules}
+    :see: `get_available_modules`
 
-    @type  arch: str
-    @param arch: Target processor architecture.
-        Must be C{None} or C{"any"} for platform independent shellcodes.
+    :type  arch: str
+    :param arch: Target processor architecture.
+        Must be *None* or *"any"* for platform independent shellcodes.
 
-    @type  os: str
-    @param os: Target operating system.
-        Must be C{None} or C{"any"} for OS independent shellcodes.
+    :type  os: str
+    :param os: Target operating system.
+        Must be *None* or *"any"* for OS independent shellcodes.
 
-    @type  module: str
-    @param module: Shellcode module name.
+    :type  module: str
+    :param module: Shellcode module name.
 
-    @rtype:  list(class)
-    @return: List of shellcode classes.
+    :rtype:  list(class)
+    :return: List of shellcode classes.
     """
 
     # Canonicalize the arch and os.
@@ -379,23 +379,23 @@ def autodetect_encoding(bytes):
     Tries to autodetect the encoding of the given shellcode bytes.
 
     Currently the following encodings are detected:
-     - C{term_null}
-     - C{nullfree}
-     - C{ascii}
-     - C{alpha}
-     - C{lower}
-     - C{upper}
-     - C{unicode}
+     - *term_null*
+     - *nullfree*
+     - *ascii*
+     - *alpha*
+     - *lower*
+     - *upper*
+     - *unicode*
 
-    @note: The detection for Unicode is only for shellcodes encoded using the
+    :note: The detection for Unicode is only for shellcodes encoded using the
         Venetian technique. It cannot tell if the shellcode would actually
         survive the codepage translation.
 
-    @type  bytes: str
-    @param bytes: Compiled bytecode to test for encodings.
+    :type  bytes: str
+    :param bytes: Compiled bytecode to test for encodings.
 
-    @rtype:  tuple(str)
-    @return: Encoding constraints for this shellcode.
+    :rtype:  tuple(str)
+    :return: Encoding constraints for this shellcode.
     """
     return meta_autodetect_encoding(bytes)
 
@@ -403,15 +403,15 @@ def find_bad_chars(bytes, bad_chars = None):
     """
     Test the given bytecode against a list of bad characters.
 
-    @type  bytes: str
-    @param bytes: Compiled bytecode to test for bad characters.
+    :type  bytes: str
+    :param bytes: Compiled bytecode to test for bad characters.
 
-    @type  bad_chars: str
-    @param bad_chars: Bad characters to test.
-        Defaults to L{default_bad_chars}.
+    :type  bad_chars: str
+    :param bad_chars: Bad characters to test.
+        Defaults to `default_bad_chars`.
 
-    @rtype:  str
-    @return: Bad characters present in the bytecode.
+    :rtype:  str
+    :return: Bad characters present in the bytecode.
     """
     if bad_chars is None:
         bad_chars = default_bad_chars
@@ -426,12 +426,12 @@ def good_chars(bad_chars = None):
     This can be useful for testing how the vulnerable program filters the
     characters we feed it.
 
-    @type  bad_chars: str
-    @param bad_chars: Bad characters to test.
-        Defaults to L{default_bad_chars}.
+    :type  bad_chars: str
+    :param bad_chars: Bad characters to test.
+        Defaults to `default_bad_chars`.
 
-    @rtype:  str
-    @return: Good characters.
+    :rtype:  str
+    :return: Good characters.
     """
     if bad_chars is None:
         bad_chars = default_bad_chars
@@ -444,15 +444,15 @@ def random_chars(length, bad_chars = None):
 
     This can be useful to randomize the payload of our exploits.
 
-    @type  length: int
-    @param length: How many characters to generate.
+    :type  length: int
+    :param length: How many characters to generate.
 
-    @type  bad_chars: str
-    @param bad_chars: Bad characters to test.
-        Defaults to L{default_bad_chars}.
+    :type  bad_chars: str
+    :param bad_chars: Bad characters to test.
+        Defaults to `default_bad_chars`.
 
-    @rtype:  str
-    @return: String of random characters.
+    :rtype:  str
+    :return: String of random characters.
     """
     if bad_chars is None:
         bad_chars = default_bad_chars
@@ -470,12 +470,12 @@ def is_stack_balanced(shellcode):
     Determines if a given shellcode is stack balanced,
     by examining its metadata.
 
-    @type  shellcode: L{Shellcode}
-    @param shellcode: Any shellcode.
+    :type  shellcode: `Shellcode`
+    :param shellcode: Any shellcode.
 
-    @rtype:  bool
-    @return: C{True} if the shellcode's metadata claims it's stack balanced,
-        C{False otherwise}.
+    :rtype:  bool
+    :return: *True* if the shellcode's metadata claims it's stack balanced,
+        *False* otherwise.
     """
     queue = [shellcode]
     while queue:
@@ -498,11 +498,11 @@ def print_shellcode_tree(shellcode, indent = 0):
 
     Useful for debugging.
 
-    @type  shellcode: L{Shellcode}
-    @param shellcode: Any shellcode.
+    :type  shellcode: `Shellcode`
+    :param shellcode: Any shellcode.
 
-    @type  indent: int
-    @param indent: Indentation level.
+    :type  indent: int
+    :param indent: Indentation level.
     """
 
     # Make sure all we get are Shellcode instances.
@@ -564,15 +564,15 @@ def iter_shellcode(shellcode, clazz = Shellcode):
     Iterate through all pieces of shellcode matching the given base class,
     in left to right order.
 
-    @type  shellcode: L{Shellcode}
-    @param shellcode: Root of the shellcode tree.
+    :type  shellcode: `Shellcode`
+    :param shellcode: Root of the shellcode tree.
 
-    @type  clazz: class
-    @param clazz: Shellcode class to look for. Matching pieces of shellcode
+    :type  clazz: class
+    :param clazz: Shellcode class to look for. Matching pieces of shellcode
         will be instances of this class or a derived class.
 
-    @rtype:  iterator of L{Shellcode}
-    @return: Iterator of matching pieces of shellcode.
+    :rtype:  iterator of `Shellcode`
+    :return: Iterator of matching pieces of shellcode.
     """
     queue = [shellcode]
     while queue:
@@ -586,17 +586,17 @@ def find_shellcode(shellcode, clazz):
     Find the first matching piece of shellcode
     that is an instance of the given class.
 
-    @type  shellcode: L{Shellcode}
-    @param shellcode: Root of the shellcode tree.
+    :type  shellcode: `Shellcode`
+    :param shellcode: Root of the shellcode tree.
 
-    @type  clazz: class
-    @param clazz: Shellcode class to look for. Matching pieces of shellcode
+    :type  clazz: class
+    :param clazz: Shellcode class to look for. Matching pieces of shellcode
         will be instances of this class or a derived class.
 
-    @rtype:  L{Shellcode}
-    @return: Matching piece of shellcode.
+    :rtype:  `Shellcode`
+    :return: Matching piece of shellcode.
 
-    @raise StopIteration: The piece of shellcode was not found.
+    :raise StopIteration: The piece of shellcode was not found.
     """
     return iter_shellcode(shellcode, clazz).next()
 
@@ -605,31 +605,32 @@ def find_shellcode(shellcode, clazz):
 def load_bytecode_from_source(input):
     """
     Load raw bytecode from an exported source code
-    generated by the L{shellgen.export} subpackage.
+    generated by the `shellgen.export` subpackage.
 
     This function will NOT work with raw binary files, hexadecimal dumps, nor
     Base64 encoded files.
 
-    To read exported dump files, use L{load_bytecode_from_dump}() instead.
+    To read exported dump files, use `load_bytecode_from_dump` instead.
 
-    @see:
-         - L{shellgen.export.as_python_source}
-         - L{shellgen.export.as_ruby_source}
-         - L{shellgen.export.as_perl_source}
-         - L{shellgen.export.as_php_source}
-         - L{shellgen.export.as_javascript_source}
-         - L{shellgen.export.as_vbscript_source}
-         - L{shellgen.export.as_c_source}
-         - L{shellgen.export.as_cpp_source}
+    .. see:
 
-    @type  input: file or str
-    @param input: Filename or open file object.
+        - `shellgen.export.as_python_source*
+        - `shellgen.export.as_ruby_source*
+        - `shellgen.export.as_perl_source*
+        - `shellgen.export.as_php_source*
+        - `shellgen.export.as_javascript_source*
+        - `shellgen.export.as_vbscript_source*
+        - `shellgen.export.as_c_source*
+        - `shellgen.export.as_cpp_source*
+
+    :type  input: file or str
+    :param input: Filename or open file object.
         Open file objects should be in universal newline mode.
 
-    @rtype:  str
-    @return: Imported bytecode.
+    :rtype:  str
+    :return: Imported bytecode.
 
-    @raise IOError: An error has occurred while trying to load the bytecode.
+    :raise IOError: An error has occurred while trying to load the bytecode.
     """
 
     # Filenames are converted to file objects and garbage collected properly.
@@ -686,26 +687,27 @@ def _load_bytecode_from_source(input):
 def load_bytecode_from_dump(input):
     """
     Load raw bytecode from an exported dump file
-    generated by the L{shellgen.export} subpackage.
+    generated by the `shellgen.export` subpackage.
 
     This function will ONLY work with raw binary files, hexadecimal dumps,
     or Base64 encoded files.
 
-    To read source code exports, use L{load_bytecode_from_source}() instead.
+    To read source code exports, use `load_bytecode_from_source` instead.
 
-    @see:
-         - L{shellgen.export.as_raw_binary}
-         - L{shellgen.export.as_hexadecimal}
-         - L{shellgen.export.as_base64}
+    .. see:
 
-    @type  input: file or str
-    @param input: Filename or open file object.
+        - `shellgen.export.as_raw_binary`
+        - `shellgen.export.as_hexadecimal`
+        - `shellgen.export.as_base64`
+
+    :type  input: file or str
+    :param input: Filename or open file object.
         Open file objects should be in binary mode.
 
-    @rtype:  str
-    @return: Imported bytecode.
+    :rtype:  str
+    :return: Imported bytecode.
 
-    @raise IOError: An error has occurred while trying to load the bytecode.
+    :raise IOError: An error has occurred while trying to load the bytecode.
     """
 
     # Filenames are converted to file objects and garbage collected properly.
@@ -742,17 +744,17 @@ def connect_to_shell(hostname, port = 4444, use_ssl = False):
     """
     Connect to the bindshell at the given host and port.
 
-    @type  hostname: str
-    @param hostname: Hostname or IP address to connect to.
+    :type  hostname: str
+    :param hostname: Hostname or IP address to connect to.
 
-    @type  port: int
-    @param port: Port number to connect to.
+    :type  port: int
+    :param port: Port number to connect to.
 
-    @type  use_ssl: int
-    @param use_ssl: C{True} to connect using SSL,
-        C{False} to establish a plaintext connection.
+    :type  use_ssl: int
+    :param use_ssl: *True* to connect using SSL,
+        *False* to establish a plaintext connection.
 
-    @raise socket.error: Connection error.
+    :raise socket.error: Connection error.
     """
     evt = threading.Event()
     evt.clear()

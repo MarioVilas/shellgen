@@ -24,10 +24,10 @@
 """
 Shellcode export formats for ShellGen.
 
-@type exporters: dict(str -> callable)
-@var  exporters:
+:type exporters: dict(str -> callable)
+:var  exporters:
     Map of output formats to their corresponding exporter functions.
-    If you add your own format here, L{export}() will use it.
+    If you add your own format here, `export` will use it.
 """
 
 from __future__ import absolute_import
@@ -146,20 +146,20 @@ def as_raw_binary(shellcode, output):
     """
     Export the given shellcode as a raw binary file.
 
-    @note: This function will not generate executable files.
+    :note: This function will not generate executable files.
         The bytecode is just dumped into the file without format.
 
-    @warn: The file B{MUST} be opened in B{binary} mode.
+    :warn: The file **MUST** be opened in **binary* mode.
         Failure to do so may result in data corruption!
 
-    @type  shellcode: L{Shellcode}
-    @param shellcode: Any shellcode.
+    :type  shellcode: `Shellcode`
+    :param shellcode: Any shellcode.
 
-    @type  output: file or str
-    @param output: Filename or open file object.
+    :type  output: file or str
+    :param output: Filename or open file object.
 
-    @rtype:  int
-    @return: Number of bytes written.
+    :rtype:  int
+    :return: Number of bytes written.
     """
     bytes = shellcode.bytes
     output.write(bytes)
@@ -170,17 +170,17 @@ def as_base64(shellcode, output):
     """
     Export the given shellcode in Base64 format.
 
-    @type  shellcode: L{Shellcode}
-    @param shellcode: Any shellcode.
+    :type  shellcode: `Shellcode`
+    :param shellcode: Any shellcode.
 
-    @type  output: file or str
-    @param output: Filename or open file object.
+    :type  output: file or str
+    :param output: Filename or open file object.
 
-    @rtype:  int
-    @return: Number of bytes written.
+    :rtype:  int
+    :return: Number of bytes written.
         May be inaccurate if the file was not opened in binary mode on certain
-        platforms. For example on Windows an extra C{\r} will be prepended to
-        each C{\n} character by Python without this function knowing about it.
+        platforms. For example on Windows an extra *\\r* will be prepended to
+        each *\\n* character by Python without this function knowing about it.
     """
     bytes = shellcode.bytes.encode('base64')
     output.write(bytes)
@@ -192,17 +192,17 @@ def as_hexadecimal(shellcode, output):
     Export the given shellcode as an hexadecimal string.
     Useful for debugging or searching for the bytecode with an hex editor.
 
-    @type  shellcode: L{Shellcode}
-    @param shellcode: Any shellcode.
+    :type  shellcode: `Shellcode`
+    :param shellcode: Any shellcode.
 
-    @type  output: file or str
-    @param output: Filename or open file object.
+    :type  output: file or str
+    :param output: Filename or open file object.
 
-    @rtype:  int
-    @return: Number of bytes written.
+    :rtype:  int
+    :return: Number of bytes written.
         May be inaccurate if the file was not opened in binary mode on certain
-        platforms. For example on Windows an extra C{\r} will be prepended to
-        each C{\n} character by Python without this function knowing about it.
+        platforms. For example on Windows an extra *\\r* will be prepended to
+        each *\\n* character by Python without this function knowing about it.
     """
     return _generic_source_exporter(
         shellcode, output,
@@ -219,17 +219,17 @@ def as_python_source(shellcode, output):
     Export the given shellcode as Python source code
     to be embedded into your exploit.
 
-    @type  shellcode: L{Shellcode}
-    @param shellcode: Any shellcode.
+    :type  shellcode: `Shellcode`
+    :param shellcode: Any shellcode.
 
-    @type  output: file or str
-    @param output: Filename or open file object.
+    :type  output: file or str
+    :param output: Filename or open file object.
 
-    @rtype:  int
-    @return: Number of bytes written.
+    :rtype:  int
+    :return: Number of bytes written.
         May be inaccurate if the file was not opened in binary mode on certain
-        platforms. For example on Windows an extra C{\r} will be prepended to
-        each C{\n} character by Python without this function knowing about it.
+        platforms. For example on Windows an extra *\\r* will be prepended to
+        each *\\n* character by Python without this function knowing about it.
     """
     return _generic_source_exporter(
         shellcode, output,
@@ -245,17 +245,17 @@ def as_ruby_source(shellcode, output):
     Export the given shellcode as Ruby source code
     to be embedded into your exploit.
 
-    @type  shellcode: L{Shellcode}
-    @param shellcode: Any shellcode.
+    :type  shellcode: `Shellcode`
+    :param shellcode: Any shellcode.
 
-    @type  output: file or str
-    @param output: Filename or open file object.
+    :type  output: file or str
+    :param output: Filename or open file object.
 
-    @rtype:  int
-    @return: Number of bytes written.
+    :rtype:  int
+    :return: Number of bytes written.
         May be inaccurate if the file was not opened in binary mode on certain
-        platforms. For example on Windows an extra C{\r} will be prepended to
-        each C{\n} character by Python without this function knowing about it.
+        platforms. For example on Windows an extra *\\r* will be prepended to
+        each *\\n* character by Python without this function knowing about it.
     """
     return _generic_source_exporter(
         shellcode, output,
@@ -272,17 +272,17 @@ def as_perl_source(shellcode, output):
     Export the given shellcode as Perl source code
     to be embedded into your exploit.
 
-    @type  shellcode: L{Shellcode}
-    @param shellcode: Any shellcode.
+    :type  shellcode: `Shellcode`
+    :param shellcode: Any shellcode.
 
-    @type  output: file or str
-    @param output: Filename or open file object.
+    :type  output: file or str
+    :param output: Filename or open file object.
 
-    @rtype:  int
-    @return: Number of bytes written.
+    :rtype:  int
+    :return: Number of bytes written.
         May be inaccurate if the file was not opened in binary mode on certain
-        platforms. For example on Windows an extra C{\r} will be prepended to
-        each C{\n} character by Python without this function knowing about it.
+        platforms. For example on Windows an extra *\\r* will be prepended to
+        each *\\n* character by Python without this function knowing about it.
     """
     return _generic_source_exporter(
         shellcode, output,
@@ -299,17 +299,17 @@ def as_php_source(shellcode, output):
     Export the given shellcode as PHP source code
     to be embedded into your exploit.
 
-    @type  shellcode: L{Shellcode}
-    @param shellcode: Any shellcode.
+    :type  shellcode: `Shellcode`
+    :param shellcode: Any shellcode.
 
-    @type  output: file or str
-    @param output: Filename or open file object.
+    :type  output: file or str
+    :param output: Filename or open file object.
 
-    @rtype:  int
-    @return: Number of bytes written.
+    :rtype:  int
+    :return: Number of bytes written.
         May be inaccurate if the file was not opened in binary mode on certain
-        platforms. For example on Windows an extra C{\r} will be prepended to
-        each C{\n} character by Python without this function knowing about it.
+        platforms. For example on Windows an extra *\\r* will be prepended to
+        each *\\n* character by Python without this function knowing about it.
     """
     return _generic_source_exporter(
         shellcode, output,
@@ -327,17 +327,17 @@ def as_javascript_source(shellcode, output):
     Export the given shellcode as JavaScript source code
     to be embedded into your exploit.
 
-    @type  shellcode: L{Shellcode}
-    @param shellcode: Any shellcode.
+    :type  shellcode: `Shellcode`
+    :param shellcode: Any shellcode.
 
-    @type  output: file or str
-    @param output: Filename or open file object.
+    :type  output: file or str
+    :param output: Filename or open file object.
 
-    @rtype:  int
-    @return: Number of bytes written.
+    :rtype:  int
+    :return: Number of bytes written.
         May be inaccurate if the file was not opened in binary mode on certain
-        platforms. For example on Windows an extra C{\r} will be prepended to
-        each C{\n} character by Python without this function knowing about it.
+        platforms. For example on Windows an extra *\\r* will be prepended to
+        each *\\n* character by Python without this function knowing about it.
     """
     return _generic_source_exporter(
         shellcode, output,
@@ -354,17 +354,17 @@ def as_vbscript_source(shellcode, output):
     Export the given shellcode as VBScript source code
     to be embedded into your exploit.
 
-    @type  shellcode: L{Shellcode}
-    @param shellcode: Any shellcode.
+    :type  shellcode: `Shellcode`
+    :param shellcode: Any shellcode.
 
-    @type  output: file or str
-    @param output: Filename or open file object.
+    :type  output: file or str
+    :param output: Filename or open file object.
 
-    @rtype:  int
-    @return: Number of bytes written.
+    :rtype:  int
+    :return: Number of bytes written.
         May be inaccurate if the file was not opened in binary mode on certain
-        platforms. For example on Windows an extra C{\r} will be prepended to
-        each C{\n} character by Python without this function knowing about it.
+        platforms. For example on Windows an extra *\\r* will be prepended to
+        each *\\n* character by Python without this function knowing about it.
     """
     return _generic_source_exporter(
         shellcode, output,
@@ -381,17 +381,17 @@ def as_c_source(shellcode, output):
     Export the given shellcode as C source code
     to be embedded into your exploit.
 
-    @type  shellcode: L{Shellcode}
-    @param shellcode: Any shellcode.
+    :type  shellcode: `Shellcode`
+    :param shellcode: Any shellcode.
 
-    @type  output: file or str
-    @param output: Filename or open file object.
+    :type  output: file or str
+    :param output: Filename or open file object.
 
-    @rtype:  int
-    @return: Number of bytes written.
+    :rtype:  int
+    :return: Number of bytes written.
         May be inaccurate if the file was not opened in binary mode on certain
-        platforms. For example on Windows an extra C{\r} will be prepended to
-        each C{\n} character by Python without this function knowing about it.
+        platforms. For example on Windows an extra *\\r* will be prepended to
+        each *\\n* character by Python without this function knowing about it.
     """
     return _generic_source_exporter(
         shellcode, output,
@@ -407,17 +407,17 @@ def as_cpp_source(shellcode, output):
     Export the given shellcode as C++ source code
     to be embedded into your exploit.
 
-    @type  shellcode: L{Shellcode}
-    @param shellcode: Any shellcode.
+    :type  shellcode: `Shellcode`
+    :param shellcode: Any shellcode.
 
-    @type  output: file or str
-    @param output: Filename or open file object.
+    :type  output: file or str
+    :param output: Filename or open file object.
 
-    @rtype:  int
-    @return: Number of bytes written.
+    :rtype:  int
+    :return: Number of bytes written.
         May be inaccurate if the file was not opened in binary mode on certain
-        platforms. For example on Windows an extra C{\r} will be prepended to
-        each C{\n} character by Python without this function knowing about it.
+        platforms. For example on Windows an extra *\\r* will be prepended to
+        each *\\n* character by Python without this function knowing about it.
     """
     return _generic_source_exporter(
         shellcode, output,
@@ -449,39 +449,39 @@ def export(shellcode, output, format = 'python'):
     """
     Export the given shellcode with the desired format.
 
-    @note: Generally you'll want to use this function only when the output
+    :note: Generally you'll want to use this function only when the output
         format comes from user input. In your own scripts you can just call
         the corresponding exporter function from this module.
 
-    @warn: For binary output formats, the output file B{MUST} be opened in
-        B{binary} mode. Failure to do so may result in data corruption!
+    :warn: For binary output formats, the output file **MUST** be opened in
+        **binary** mode. Failure to do so may result in data corruption!
 
-    @type  shellcode: L{Shellcode}
-    @param shellcode: Any shellcode.
+    :type  shellcode: `Shellcode`
+    :param shellcode: Any shellcode.
 
-    @type  output: file or str
-    @param output: Filename or open file object.
+    :type  output: file or str
+    :param output: Filename or open file object.
 
-    @type  format: str
-    @param format: Desired output format.
+    :type  format: str
+    :param format: Desired output format.
         Must be one of the following:
-         - C{'raw'}: Raw binary file with no format.
-         - C{'base64'}: Base64 encoded file.
-         - C{'hex'}: Hexadecimal text file.
-         - C{'Python'}: Python source code.
-         - C{'Ruby'}: Ruby source code.
-         - C{'Perl'}: Perl source code.
-         - C{'PHP'}: PHP source code.
-         - C{'JavaScript'}: JavaScript source code.
-         - C{'VBScript'}: VBScript source code.
-         - C{'C'}: C source code.
-         - C{'C++'}: C++ source code.
+        - *'raw'*: Raw binary file with no format.
+        - *'base64'*: Base64 encoded file.
+        - *'hex'*: Hexadecimal text file.
+        - *'Python'*: Python source code.
+        - *'Ruby'*: Ruby source code.
+        - *'Perl'*: Perl source code.
+        - *'PHP'*: PHP source code.
+        - *'JavaScript'*: JavaScript source code.
+        - *'VBScript'*: VBScript source code.
+        - *'C'*: C source code.
+        - *'C++'*: C++ source code.
 
-    @rtype:  int
-    @return: Number of bytes written.
+    :rtype:  int
+    :return: Number of bytes written.
         May be inaccurate if the file was not opened in binary mode on certain
-        platforms. For example on Windows an extra C{\\r} will be prepended to
-        each C{\\n} character by Python without this function knowing about it.
+        platforms. For example on Windows an extra *\\r* will be prepended to
+        each *\\n* character by Python without this function knowing about it.
     """
     try:
         function = exporters[ format.strip().lower() ]

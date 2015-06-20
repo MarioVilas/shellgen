@@ -36,7 +36,7 @@ class EICAR (Static):
 
     Anecdotically, the string also happens to be a valid DOS executable file.
 
-    For more details see: U{https://en.wikipedia.org/wiki/EICAR_test_file}
+    For more details see: `<https://en.wikipedia.org/wiki/EICAR_test_file>`_
     """
 
     qualities = "payload"

@@ -38,12 +38,12 @@ class ConnectShell (Dynamic):
     "Connect to an arbitrary IP and TCP port execute /bin/sh in Linux/x86.
 
     Based on original code by Maximiliano Gomez Vidal:
-    U{http://www.exploit-db.com/exploits/36397/}
+    `<http://www.exploit-db.com/exploits/36397/>`_
 
-    @ivar address: IP address to connect to.
-    @type address: str
-    @ivar port: TCP port to connect to.
-    @type port: int
+    :ivar address: IP address to connect to.
+    :type address: str
+    :ivar port: TCP port to connect to.
+    :type port: int
     """
 
     qualities = "payload"

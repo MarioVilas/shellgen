@@ -45,7 +45,7 @@ class Hunter (Stager):
     for a file format bug.
 
     For more information see:
-    [PDF] U{http://www.hick.org/code/skape/papers/egghunt-shellcode.pdf}
+    [PDF] `<http://www.hick.org/code/skape/papers/egghunt-shellcode.pdf>`_
     """
 
     # 00000000 6681CAFF0F or dx,0xfff

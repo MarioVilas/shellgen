@@ -33,7 +33,7 @@ class Execute (Dynamic):
     Execute any command on IRIX/MIPS.
 
     Based on anonymous code found on the Internet:
-    U{http://www.shell-storm.org/shellcode/files/shellcode-139.php}
+    `<http://www.shell-storm.org/shellcode/files/shellcode-139.php>`_
     """
 
     qualities = ("payload", "no_stack")

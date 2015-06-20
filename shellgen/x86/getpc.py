@@ -134,10 +134,10 @@ class GetPC_Alt (Dynamic):
     Uses a call instruction that jumps on itself.
 
     The first public implementation of this technique is from Gerardo Richarte:
-    U{http://archive.cert.uni-stuttgart.de/vuln-dev/2003/06/msg00098.html}
+    `<http://archive.cert.uni-stuttgart.de/vuln-dev/2003/06/msg00098.html>`_
 
     This optimized version is based on the one published by Skylined:
-    U{http://skypher.com/wiki/index.php/Hacking/Shellcode/GetPC}
+    `<http://skypher.com/wiki/index.php/Hacking/Shellcode/GetPC>`_
     """
 
     provides  = "pc"
@@ -219,19 +219,20 @@ class GetPC_FPU (Dynamic):
     Another alternative GetPC implementation using the FPU state.
 
     The first public record of this idea is from "noir":
-    U{http://archive.cert.uni-stuttgart.de/vuln-dev/2003/06/msg00116.html}
+    `<http://archive.cert.uni-stuttgart.de/vuln-dev/2003/06/msg00116.html>`_
 
     This optimized version is based on the one published by Skylined:
-    U{http://skypher.com/wiki/index.php/Hacking/Shellcode/GetPC}
+    `<http://skypher.com/wiki/index.php/Hacking/Shellcode/GetPC>`_
 
     Disassembly::
+
         # $+0  D9EE       FLDZ                ; Floating point stores $+0 in its environment
         # $+2  D974E4 F4  FSTENV SS:[ESP-0xC] ; Save environment at ESP-0xC; now [ESP] = $+0
         # $+6  59         POP ECX             ; ECX = $+0
         # $+7  83E9 F2    SUB ECX, -10        ; ECX = $+10
         # $+10 ...
 
-    @note:
+    :note:
         This shellcode may be hard to single-step on because it uses the stack
         space at negative ESP offsets, which is overwritten by some debuggers.
     """
@@ -296,7 +297,7 @@ class GetPC_Wrapper (Decorator):
     This GetPC variant wraps shellcodes by providing them the address of their
     payload. Adds 10 bytes to the shellcode.
 
-    @warn: The child shellcode MUST be stack balanced.
+    :warn: The child shellcode MUST be stack balanced.
     """
     provides  = "pc"
     encoding  = "nullfree"

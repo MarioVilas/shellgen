@@ -35,7 +35,7 @@ class Shell (Static):
     Execute /bin/sh in Linux/Sparc.
 
     Based on original code by javicoder from 48bits:
-    U{http://www.48bits.com/papers/sparc_shellcodes.txt}
+    `<http://www.48bits.com/papers/sparc_shellcodes.txt>`_
     """
 
     qualities = "payload"

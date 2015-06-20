@@ -33,7 +33,7 @@ class SuidShell (Static):
     Fork and drop a suid shell in /tmp for Linux/x86.
 
     Based on anonymous code found on the Internet:
-    U{http://www.shell-storm.org/shellcode/files/shellcode-540.php}
+    `<http://www.shell-storm.org/shellcode/files/shellcode-540.php>`_
     """
 
     provides  = "root"

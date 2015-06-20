@@ -35,7 +35,7 @@ class Reboot (Static):
     Reboot the machine on MacOSX/PowerPC.
 
     Based on original code by pancake from 48bits:
-    U{http://radare.org/y/}
+    `<http://radare.org/y/>`_
     """
 
     qualities = "payload"

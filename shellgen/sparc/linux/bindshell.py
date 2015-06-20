@@ -35,8 +35,8 @@ class BindShell (Dynamic):
     "Bind to TCP port 1124 or 4444 and execute /bin/sh in Linux/Sparc.
 
     Based on original code by javicoder and pancake from 48bits:
-     - U{http://www.48bits.com/papers/sparc_shellcodes.txt}
-     - U{http://radare.org/y/}
+     - `<http://www.48bits.com/papers/sparc_shellcodes.txt>`_
+     - `<http://radare.org/y/>`_
     """
 
     qualities = "payload"

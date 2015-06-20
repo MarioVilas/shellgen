@@ -235,14 +235,14 @@ class NullFreeEncoder (Encoder):
         """
         Get the decoder stub bytecode for the 8-bit XOR algorithm.
 
-        @type  key: str
-        @param key: 8-bit XOR key.
+        :type  key: str
+        :param key: 8-bit XOR key.
 
-        @type  terminator: str
-        @param terminator: 8-bit terminator.
+        :type  terminator: str
+        :param terminator: 8-bit terminator.
 
-        @rtype:  str
-        @return: Decoder stub bytecode.
+        :rtype:  str
+        :return: Decoder stub bytecode.
         """
         if terminator == "\x00":
 
@@ -285,17 +285,17 @@ class NullFreeEncoder (Encoder):
         """
         Find a suitable 8-bit XOR key for the given bytecode.
 
-        @type  bytes: str
-        @param bytes: Bytecode to encode.
+        :type  bytes: str
+        :param bytes: Bytecode to encode.
 
-        @type  force_terminator_type: bool
-        @param force_terminator_type:
-            C{None} to pick any terminator,
-            C{True} to force the null terminator,
-            C{False} to disallow the null terminator.
+        :type  force_terminator_type: bool
+        :param force_terminator_type:
+            - *None* to pick any terminator,
+            - *True* to force the null terminator,
+            - *False* to disallow the null terminator.
 
-        @rtype:  tuple(str, str)
-        @return: 8-bit XOR key, and 8-bit terminator.
+        :rtype:  tuple(str, str)
+        :return: 8-bit XOR key, and 8-bit terminator.
         """
         if not "\x00" in bytes:
             raise ValueError("Bytecode is already null free!")
@@ -334,17 +334,17 @@ class NullFreeEncoder (Encoder):
         """
         Encode the bytecode with the given 8-bit XOR key.
 
-        @type  bytes: str
-        @param bytes: Bytecode to encode.
+        :type  bytes: str
+        :param bytes: Bytecode to encode.
 
-        @type  key: str
-        @param key: 8-bit XOR key.
+        :type  key: str
+        :param key: 8-bit XOR key.
 
-        @type  terminator: str
-        @param terminator: 8-bit terminator.
+        :type  terminator: str
+        :param terminator: 8-bit terminator.
 
-        @rtype:  str
-        @return: Encoded bytecode.
+        :rtype:  str
+        :return: Encoded bytecode.
         """
         if not bytes.endswith(terminator):
             bytes += terminator
@@ -360,14 +360,14 @@ class NullFreeEncoder (Encoder):
         """
         Pad the bytecode with NOP instructions to a align its size to n bytes.
 
-        @type  bytes: str
-        @param bytes: Bytecode to align.
+        :type  bytes: str
+        :param bytes: Bytecode to align.
 
-        @type  key_size: int
-        @param key_size: Byte size to align the shellcode to.
+        :type  key_size: int
+        :param key_size: Byte size to align the shellcode to.
 
-        @rtype:  str
-        @return: Aligned bytecode.
+        :rtype:  str
+        :return: Aligned bytecode.
         """
         tail = len(bytes) % key_size
         if tail:
@@ -380,23 +380,23 @@ class NullFreeEncoder (Encoder):
         Find a suitable n-byte XOR key and terminator token
         for the given bytecode.
 
-        @type  bytes: str
-        @param bytes: Bytecode to encode.
-            Must be at least C{key_size} bytes long.
+        :type  bytes: str
+        :param bytes: Bytecode to encode.
+            Must be at least *key_size* bytes long.
 
-        @type  key_size: int
-        @param key_size: Size of the key, in bytes.
+        :type  key_size: int
+        :param key_size: Size of the key, in bytes.
 
-        @type  force_terminator_type: bool
-        @param force_terminator_type:
-            C{None} to pick any terminator,
-            C{True} to force the null terminator,
-            C{False} to disallow the null terminator.
+        :type  force_terminator_type: bool
+        :param force_terminator_type:
+            - *None* to pick any terminator,
+            - *True* to force the null terminator,
+            - *False* to disallow the null terminator.
 
-        @rtype:  tuple(str, str)
-        @return: n-byte XOR key and terminator token, packed as two strings.
+        :rtype:  tuple(str, str)
+        :return: n-byte XOR key and terminator token, packed as two strings.
 
-        @raise EncodingError: No valid key found for this size.
+        :raise EncodingError: No valid key found for this size.
         """
         randint   = random.randint
         pack      = struct.pack
@@ -466,21 +466,21 @@ class NullFreeEncoder (Encoder):
         """
         Get the decoder stub bytecode for the variable size XOR algorithm.
 
-        @type  key: str
-        @param key: XOR key. Must be aligned to DWORD.
+        :type  key: str
+        :param key: XOR key. Must be aligned to DWORD.
 
-        @type  terminator: str
-        @param terminator: Terminator token. Must be a DWORD.
+        :type  terminator: str
+        :param terminator: Terminator token. Must be a DWORD.
 
-        @rtype:  tuple(str, list(int), int)
-        @return: Tuple containing the decoder stub bytecode, the list of
+        :rtype:  tuple(str, list(int), int)
+        :return: Tuple containing the decoder stub bytecode, the list of
             delta offsets to patch if the XOR key needs to be replaced,
             and the delta offset to patch if the terminator token needs to
             be replaced.
 
-        @raise ValueError: The key size is not aligned to DWORD,
+        :raise ValueError: The key size is not aligned to DWORD,
             or the terminator token is not a DWORD.
-        @raise CompileError: The decoder stub could not be compiled.
+        :raise CompileError: The decoder stub could not be compiled.
         """
         pack = struct.pack
         if len(key) & 3:
@@ -614,17 +614,17 @@ class NullFreeEncoder (Encoder):
         """
         Encode the bytecode with the given variable size XOR key.
 
-        @type  bytes: str
-        @param bytes: Bytecode to encode. Must be aligned to the key size.
+        :type  bytes: str
+        :param bytes: Bytecode to encode. Must be aligned to the key size.
 
-        @type  key: str
-        @param key: XOR key. Must be aligned to DWORD.
+        :type  key: str
+        :param key: XOR key. Must be aligned to DWORD.
 
-        @type  terminator: str
-        @param terminator: Terminator token. Must be a DWORD.
+        :type  terminator: str
+        :param terminator: Terminator token. Must be a DWORD.
 
-        @rtype:  str
-        @return: Encoded bytecode.
+        :rtype:  str
+        :return: Encoded bytecode.
         """
         if len(terminator) != 4:
             raise ValueError("Terminator token must be a DWORD")
@@ -663,29 +663,29 @@ class NullFreeEncoder (Encoder):
         """
         Patch the decoder stub to change the XOR key.
 
-        @type  decoder: str
-        @param decoder: Decoder stub bytecode to be patched.
+        :type  decoder: str
+        :param decoder: Decoder stub bytecode to be patched.
 
-        @type  key_deltas: list(int)
-        @param key_deltas:
+        :type  key_deltas: list(int)
+        :param key_deltas:
             List of delta offsets to patch to replace the XOR key.
 
-        @type  key: str
-        @param key: XOR key.
+        :type  key: str
+        :param key: XOR key.
 
-        @type  terminator_delta: int
-        @param terminator_delta:
+        :type  terminator_delta: int
+        :param terminator_delta:
             Delta offset to patch to replace the terminator token.
-            If C{None} the terminator token is not changed.
+            If *None* the terminator token is not changed.
 
-        @type  terminator: str
-        @param terminator: Terminator token.
-            Only required if C{terminator_delta} is not C{None}.
+        :type  terminator: str
+        :param terminator: Terminator token.
+            Only required if *terminator_delta* is not *None*.
 
-        @rtype:  str
-        @return: Patched decoded stub that uses the new key and token.
+        :rtype:  str
+        :return: Patched decoded stub that uses the new key and token.
 
-        @raise ValueError: The key size is not aligned to DWORD,
+        :raise ValueError: The key size is not aligned to DWORD,
             the terminator token is not a DWORD, or the number of key
             deltas doesn't match the key length.
         """
