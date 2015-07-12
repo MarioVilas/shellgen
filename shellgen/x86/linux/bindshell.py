@@ -39,7 +39,7 @@ class BindShell (Static):
     """
 
     qualities = "payload"
-    encoding  = "termnull"
+    encoding  = "term_null"
 
     address = "0.0.0.0"
     port = 4444
@@ -63,7 +63,7 @@ class BindShellUDP (Static):
     """
 
     qualities = "payload"
-    encoding  = "termnull"
+    encoding  = "term_null"
 
     port = 4444
 

@@ -310,11 +310,11 @@ class NullFreeEncoder (Encoder):
         key = candidates[ random.randint(0, len(candidates) - 1) ]
 
         # If the only null byte is at the end, use it as the terminator.
-        termnull = "\x00" not in bytes[:-1]
+        term_null = "\x00" not in bytes[:-1]
         if force_terminator_type is None:
-            force_terminator_type = termnull
+            force_terminator_type = term_null
         if force_terminator_type:
-            if not termnull:
+            if not term_null:
                 raise EncodingError()
             terminator = "\x00"
 
